@@ -1,14 +1,23 @@
-import React, { useState } from 'react';
+import { type SubmitEvent, useState } from 'react';
 
-const AddOrderForm = ({ addOrder }) => {
+type AddOrderFormProps = {
+  addOrder: (orderName: string) => void | Promise<void>;
+};
+
+const AddOrderForm = ({ addOrder }: AddOrderFormProps) => {
   const [orderName, setOrderName] = useState('');
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (orderName) {
-      addOrder(orderName);
-      setOrderName('');
+
+    const trimmedOrderName = orderName.trim();
+
+    if (!trimmedOrderName) {
+      return;
     }
+
+    await addOrder(trimmedOrderName);
+    setOrderName('');
   };
 
   return (
@@ -16,7 +25,7 @@ const AddOrderForm = ({ addOrder }) => {
       <input
         type="text"
         value={orderName}
-        onChange={(e) => setOrderName(e.target.value)}
+        onChange={(event) => setOrderName(event.target.value)}
         placeholder="Enter order name"
       />
       <button type="submit">Add Order</button>
