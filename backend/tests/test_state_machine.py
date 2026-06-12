@@ -103,12 +103,53 @@ def test_active_order_can_be_cancelled_by_user() -> None:
     assert next_state == OrderState.CANCELLED
 
 
+def test_on_hold_order_can_be_cancelled_by_user() -> None:
+    state_machine = OrderStateMachine()
+
+    next_state = state_machine.get_next_state(
+        OrderState.ON_HOLD,
+        OrderEventType.ORDER_CANCELLED_BY_USER,
+    )
+
+    assert next_state == OrderState.CANCELLED
+
+
 def test_delivered_order_cannot_be_cancelled_by_user() -> None:
     state_machine = OrderStateMachine()
 
     with pytest.raises(InvalidOrderTransitionError):
         state_machine.get_next_state(
             OrderState.DELIVERED,
+            OrderEventType.ORDER_CANCELLED_BY_USER,
+        )
+
+
+def test_returned_order_cannot_be_cancelled_by_user() -> None:
+    state_machine = OrderStateMachine()
+
+    with pytest.raises(InvalidOrderTransitionError):
+        state_machine.get_next_state(
+            OrderState.RETURNED,
+            OrderEventType.ORDER_CANCELLED_BY_USER,
+        )
+
+
+def test_refunded_order_cannot_be_cancelled_by_user() -> None:
+    state_machine = OrderStateMachine()
+
+    with pytest.raises(InvalidOrderTransitionError):
+        state_machine.get_next_state(
+            OrderState.REFUNDED,
+            OrderEventType.ORDER_CANCELLED_BY_USER,
+        )
+
+
+def test_cancelled_order_cannot_be_cancelled_by_user() -> None:
+    state_machine = OrderStateMachine()
+
+    with pytest.raises(InvalidOrderTransitionError):
+        state_machine.get_next_state(
+            OrderState.CANCELLED,
             OrderEventType.ORDER_CANCELLED_BY_USER,
         )
 

@@ -2,14 +2,13 @@ from app.domain import InvalidOrderTransitionError, OrderEventType, OrderState
 
 
 class OrderStateMachine:
-    _transitions: dict[tuple[OrderState, OrderEventType], OrderState] = {
+    _specific_transitions: dict[tuple[OrderState, OrderEventType], OrderState] = {
         (OrderState.PENDING, OrderEventType.PENDING_BIOMETRICAL_VERIFICATION): OrderState.ON_HOLD,
         (OrderState.PENDING, OrderEventType.NO_VERIFICATION_NEEDED): OrderState.PENDING_PAYMENT,
         (OrderState.PENDING, OrderEventType.PAYMENT_FAILED): OrderState.CANCELLED,
         (OrderState.PENDING, OrderEventType.ORDER_CANCELLED): OrderState.CANCELLED,
         (OrderState.ON_HOLD, OrderEventType.BIOMETRICAL_VERIFICATION_SUCCESSFUL): OrderState.PENDING_PAYMENT,
         (OrderState.ON_HOLD, OrderEventType.VERIFICATION_FAILED): OrderState.CANCELLED,
-        (OrderState.ON_HOLD, OrderEventType.ORDER_CANCELLED_BY_USER): OrderState.CANCELLED,
         (OrderState.PENDING_PAYMENT, OrderEventType.PAYMENT_SUCCESSFUL): OrderState.CONFIRMED,
         (OrderState.CONFIRMED, OrderEventType.PREPARING_SHIPMENT): OrderState.PROCESSING,
         (OrderState.PROCESSING, OrderEventType.ITEM_DISPATCHED): OrderState.SHIPPED,
@@ -18,13 +17,23 @@ class OrderStateMachine:
         (OrderState.DELIVERED, OrderEventType.RETURN_INITIATED_BY_CUSTOMER): OrderState.RETURNING,
         (OrderState.RETURNING, OrderEventType.ITEM_RECEIVED_BACK): OrderState.RETURNED,
         (OrderState.RETURNED, OrderEventType.REFUND_PROCESSED): OrderState.REFUNDED,
-        (OrderState.PENDING, OrderEventType.ORDER_CANCELLED_BY_USER): OrderState.CANCELLED,
-        (OrderState.PENDING_PAYMENT, OrderEventType.ORDER_CANCELLED_BY_USER): OrderState.CANCELLED,
-        (OrderState.CONFIRMED, OrderEventType.ORDER_CANCELLED_BY_USER): OrderState.CANCELLED,
-        (OrderState.PROCESSING, OrderEventType.ORDER_CANCELLED_BY_USER): OrderState.CANCELLED,
-        (OrderState.SHIPPED, OrderEventType.ORDER_CANCELLED_BY_USER): OrderState.CANCELLED,
-        (OrderState.ON_HOLD, OrderEventType.ORDER_CANCELLED_BY_USER): OrderState.CANCELLED,
-        (OrderState.RETURNING, OrderEventType.ORDER_CANCELLED_BY_USER): OrderState.CANCELLED,
+    }
+    _cancellable_states: set[OrderState] = {
+        OrderState.PENDING,
+        OrderState.ON_HOLD,
+        OrderState.PENDING_PAYMENT,
+        OrderState.CONFIRMED,
+        OrderState.PROCESSING,
+        OrderState.SHIPPED,
+        OrderState.RETURNING,
+    }
+    _user_cancellation_transitions: dict[tuple[OrderState, OrderEventType], OrderState] = {
+        (state, OrderEventType.ORDER_CANCELLED_BY_USER): OrderState.CANCELLED
+        for state in _cancellable_states
+    }
+    _transitions: dict[tuple[OrderState, OrderEventType], OrderState] = {
+        **_specific_transitions,
+        **_user_cancellation_transitions,
     }
 
     def get_next_state(
