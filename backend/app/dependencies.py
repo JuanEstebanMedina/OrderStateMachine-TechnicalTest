@@ -1,4 +1,3 @@
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -8,19 +7,23 @@ from app.ports import OrderRepository, SupportTicketRepository
 from app.services import OrderService, OrderStateMachine
 
 
-@lru_cache
+_order_repository: OrderRepository = InMemoryOrderRepository()
+_support_ticket_repository: SupportTicketRepository = (
+    InMemorySupportTicketRepository()
+)
+_state_machine = OrderStateMachine()
+
+
 def get_order_repository() -> OrderRepository:
-    return InMemoryOrderRepository()
+    return _order_repository
 
 
-@lru_cache
 def get_support_ticket_repository() -> SupportTicketRepository:
-    return InMemorySupportTicketRepository()
+    return _support_ticket_repository
 
 
-@lru_cache
 def get_state_machine() -> OrderStateMachine:
-    return OrderStateMachine()
+    return _state_machine
 
 
 def get_order_service(

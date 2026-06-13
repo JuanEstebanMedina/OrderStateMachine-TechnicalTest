@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from app.domain import InvalidOrderTransitionError, OrderNotFoundError
 
 
-async def order_not_found_handler(
+def order_not_found_handler(
     _request: Request,
     exc: OrderNotFoundError,
 ) -> JSONResponse:
@@ -14,7 +14,7 @@ async def order_not_found_handler(
     )
 
 
-async def invalid_order_transition_handler(
+def invalid_order_transition_handler(
     _request: Request,
     exc: InvalidOrderTransitionError,
 ) -> JSONResponse:
