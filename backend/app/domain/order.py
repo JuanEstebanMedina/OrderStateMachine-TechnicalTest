@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID
 
 from app.domain.order_event import OrderEventType
 from app.domain.order_state import OrderState
@@ -21,7 +22,7 @@ class OrderEventLog:
 
 @dataclass
 class Order:
-    id: str
+    id: UUID
     product_ids: list[str]
     amount: float
     current_state: OrderState = OrderState.PENDING

@@ -1,6 +1,7 @@
 from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any, Callable
+from uuid import UUID
 import uuid
 
 from app.domain import (
@@ -38,7 +39,7 @@ class OrderService:
         amount: float,
     ) -> Order:
         order = Order(
-            id=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             product_ids=product_ids,
             amount=amount,
             current_state=OrderState.PENDING,
@@ -46,7 +47,7 @@ class OrderService:
 
         return self._order_repository.save(order)
 
-    def get_order(self, order_id: str) -> Order:
+    def get_order(self, order_id: UUID) -> Order:
         order = self._order_repository.get_by_id(order_id)
         if order is None:
             raise OrderNotFoundError(f"Order {order_id} not found")
@@ -58,7 +59,7 @@ class OrderService:
 
     def apply_event(
         self,
-        order_id: str,
+        order_id: UUID,
         event_type: OrderEventType,
         metadata: dict[str, Any] | None = None,
     ) -> Order:
@@ -94,7 +95,7 @@ class OrderService:
             return
 
         ticket = SupportTicket(
-            id=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             order_id=order.id,
             reason="High-value order payment failed",
             metadata={
