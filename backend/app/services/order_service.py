@@ -1,6 +1,6 @@
 from copy import deepcopy
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Any
 from uuid import UUID
 import uuid
 
@@ -26,12 +26,6 @@ class OrderService:
         self._order_repository = order_repository
         self._support_ticket_repository = support_ticket_repository
         self._state_machine = state_machine
-        self._event_handlers: dict[
-            OrderEventType,
-            Callable[[Order, dict[str, Any]], None],
-        ] = {
-            OrderEventType.PAYMENT_FAILED: self._handle_payment_failed,
-        }
 
     def create_order(
         self,
@@ -80,11 +74,18 @@ class OrderService:
             )
         )
 
-        handler = self._event_handlers.get(event_type)
-        if handler is not None:
-            handler(order, event_metadata)
+        self._handle_event(order, event_type, event_metadata)
 
         return self._order_repository.save(order)
+
+    def _handle_event(
+        self,
+        order: Order,
+        event_type: OrderEventType,
+        metadata: dict[str, Any],
+    ) -> None:
+        if event_type == OrderEventType.PAYMENT_FAILED:
+            self._handle_payment_failed(order, metadata)
 
     def _handle_payment_failed(
         self,
