@@ -20,6 +20,11 @@ API routes
 
 Pydantic schemas are HTTP request and response DTOs. Domain models remain independent from FastAPI and Pydantic. Concrete adapters are selected in `app/dependencies.py`, so business logic depends on repository ports rather than infrastructure implementations.
 
+Order creation requests are normalized by the API: product IDs are trimmed,
+empty IDs are rejected, duplicates are removed while preserving order, and the
+amount must be a finite number greater than zero. Invalid create payloads return
+HTTP 422.
+
 ## Running the backend
 
 ```bash
@@ -75,6 +80,14 @@ VITE_API_BASE_URL=http://localhost:8000
 
 Do not configure a Vite proxy. The frontend calls the configured API URL
 directly, and FastAPI CORS controls allowed browser origins.
+
+The dashboard starts in an overview mode with summary cards, create-order
+controls, a full UUID lookup form, and responsive order cards. Selecting an
+order opens a workspace view with order identity, event application, history,
+and a contextual state-machine diagram. The diagram uses backend transition
+metadata for edges; the default view shows only visited and currently available
+transitions, while the full transition inventory remains available in a
+disclosure.
 
 ## Validation
 

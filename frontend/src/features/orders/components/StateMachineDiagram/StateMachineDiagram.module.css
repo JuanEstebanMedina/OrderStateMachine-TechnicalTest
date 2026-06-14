@@ -57,10 +57,27 @@
   background: var(--color-danger);
 }
 
+:global(.legend-dot.visited) {
+  background: #99f6e4;
+}
+
+:global(.legend-dot.available) {
+  background: #facc15;
+}
+
 :global(.legend-line) {
   width: 24px;
   height: 2px;
   background: var(--color-text-muted);
+}
+
+:global(.legend-line.historical) {
+  background: var(--color-accent);
+}
+
+:global(.legend-line.available-line) {
+  border-top: 2px dashed #64748b;
+  background: transparent;
 }
 
 :global(.diagram-scroll) {
@@ -76,20 +93,27 @@
   height: auto;
 }
 
-:global(.diagram-links path) {
+:global(.diagram-edge) {
   fill: none;
   stroke: #64748b;
   stroke-width: 2;
 }
 
-:global(.diagram-links marker path) {
-  fill: #64748b;
+:global(.historical-edge) {
+  stroke: var(--color-accent);
+  stroke-width: 3;
 }
 
-:global(.diagram-links text) {
-  fill: var(--color-text);
-  font-size: 13px;
-  text-anchor: middle;
+:global(.available-edge) {
+  stroke-dasharray: 7 5;
+}
+
+:global(.cancelled-edge) {
+  stroke-dasharray: 5 6;
+}
+
+:global(.diagram-links marker path) {
+  fill: #64748b;
 }
 
 :global(.diagram-node rect) {
@@ -105,9 +129,24 @@
   text-anchor: middle;
 }
 
+:global(.diagram-node .node-status) {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
 :global(.diagram-node.current rect) {
-  fill: rgba(20, 184, 166, 0.14);
+  fill: rgba(20, 184, 166, 0.22);
   stroke: var(--color-accent);
+  stroke-width: 3;
+}
+
+:global(.diagram-node.visited rect) {
+  fill: rgba(20, 184, 166, 0.1);
+}
+
+:global(.diagram-node.available rect) {
+  stroke: #ca8a04;
   stroke-width: 3;
 }
 
@@ -117,6 +156,51 @@
 
 :global(.diagram-node circle) {
   fill: var(--color-danger);
+}
+
+:global(.transition-lists) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+:global(.transition-lists h3) {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-strong);
+  font-size: 1rem;
+}
+
+:global(.transition-lists ul) {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+:global(.transition-inventory) {
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+:global(.transition-inventory summary) {
+  cursor: pointer;
+  color: var(--color-accent-strong);
+  font-weight: 800;
+}
+
+:global(.transition-inventory table) {
+  width: 100%;
+  margin-top: var(--space-3);
+  border-collapse: collapse;
+}
+
+:global(.transition-inventory th),
+:global(.transition-inventory td) {
+  padding: 8px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
 }
 
 :global(.sr-only) {
@@ -134,5 +218,9 @@
 @media (max-width: 640px) {
   :global(.diagram-section) {
     padding: 14px;
+  }
+
+  :global(.transition-lists) {
+    grid-template-columns: 1fr;
   }
 }

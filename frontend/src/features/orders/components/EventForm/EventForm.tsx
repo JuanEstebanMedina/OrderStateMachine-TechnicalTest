@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react';
-import { Send } from 'lucide-react';
+import { RefreshCw, Send } from 'lucide-react';
 
 import styles from './EventForm.module.css';
 import type { OrderEventType } from '../../model/orderEvents';
@@ -9,9 +9,12 @@ import { getApiErrorMessage } from '../../../../shared/api/apiError';
 
 type EventFormProps = {
   availableEvents: OrderEventType[];
+  loadError: string | null;
+  isLoading: boolean;
   isSubmitting: boolean;
   isDisabled: boolean;
   onApply: (request: ApplyOrderEventRequest) => Promise<void>;
+  onRetry: () => void;
 };
 
 function parseMetadata(value: string): OrderMetadata {
@@ -30,9 +33,12 @@ function parseMetadata(value: string): OrderMetadata {
 
 export function EventForm({
   availableEvents,
+  loadError,
+  isLoading,
   isSubmitting,
   isDisabled,
   onApply,
+  onRetry,
 }: EventFormProps) {
   const [selectedEvent, setSelectedEvent] = useState<OrderEventType | ''>('');
   const [metadataValue, setMetadataValue] = useState('{}');
@@ -64,7 +70,7 @@ export function EventForm({
         className={`${styles.moduleScope} panel event-panel`}
         aria-labelledby="event-form-title"
       >
-        <h2 id="event-form-title">Available event</h2>
+        <h2 id="event-form-title">Apply available event</h2>
         <p className="muted">Select an order before applying events.</p>
       </section>
     );
@@ -76,14 +82,32 @@ export function EventForm({
       aria-labelledby="event-form-title"
     >
       <div className="panel-heading">
-        <h2 id="event-form-title">Available event</h2>
+        <h2 id="event-form-title">Apply available event</h2>
       </div>
 
-      {availableEvents.length === 0 ? (
+      {isLoading ? (
+        <p className="muted" role="status">
+          Loading available events.
+        </p>
+      ) : null}
+
+      {loadError ? (
+        <div className="inline-error" role="alert">
+          <p>{loadError}</p>
+          <button type="button" className="button secondary" onClick={onRetry}>
+            <RefreshCw aria-hidden="true" size={18} />
+            Retry available events
+          </button>
+        </div>
+      ) : null}
+
+      {!isLoading && !loadError && availableEvents.length === 0 ? (
         <p className="muted">
           No further transitions are available for this order.
         </p>
-      ) : (
+      ) : null}
+
+      {!isLoading && !loadError && availableEvents.length > 0 ? (
         <form className="stacked-form" onSubmit={handleSubmit} noValidate>
           <div className="form-field">
             <label htmlFor="eventType">Event</label>
@@ -122,7 +146,7 @@ export function EventForm({
             {isSubmitting ? 'Applying' : 'Apply event'}
           </button>
         </form>
-      )}
+      ) : null}
     </section>
   );
 }

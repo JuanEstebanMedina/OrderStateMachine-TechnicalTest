@@ -1,21 +1,38 @@
 import styles from './StateMachineDiagram.module.css';
+import type { OrderEventType } from '../../model/orderEvents';
+import type { OrderDetail } from '../../model/order.types';
 import type { OrderState } from '../../model/orderStates';
-import type { StateMachineDefinition } from '../../model/stateMachine.types';
+import type {
+  StateMachineDefinition,
+  StateMachineTransition,
+} from '../../model/stateMachine.types';
 import { formatOrderEvent, formatOrderState } from '../../utils/orderFormatters';
 import { EmptyState } from '../../../../shared/ui/EmptyState/EmptyState';
 import { LoadingState } from '../../../../shared/ui/LoadingState/LoadingState';
 
 type StateMachineDiagramProps = {
+  availableEvents: OrderEventType[];
   definition: StateMachineDefinition | null;
   error: string | null;
   isLoading: boolean;
-  selectedState: OrderState | null;
+  order: OrderDetail | null;
 };
 
 type Position = {
   x: number;
   y: number;
 };
+
+type VisibleEdge = {
+  id: string;
+  fromState: OrderState;
+  toState: OrderState;
+  eventTypes: OrderEventType[];
+  kind: 'historical' | 'available';
+};
+
+const NODE_WIDTH = 136;
+const NODE_HEIGHT = 52;
 
 const STATE_POSITIONS: Record<OrderState, Position> = {
   Pending: { x: 80, y: 160 },
@@ -31,19 +48,103 @@ const STATE_POSITIONS: Record<OrderState, Position> = {
   Cancelled: { x: 470, y: 430 },
 };
 
-function pathFor(from: Position, to: Position, index: number): string {
-  const offset = index % 2 === 0 ? 0 : 20;
+function getBorderPoint(from: Position, to: Position): Position {
+  const deltaX = to.x - from.x;
+  const deltaY = to.y - from.y;
+  const scale = Math.min(
+    Math.abs(deltaX) > 0 ? NODE_WIDTH / 2 / Math.abs(deltaX) : Infinity,
+    Math.abs(deltaY) > 0 ? NODE_HEIGHT / 2 / Math.abs(deltaY) : Infinity,
+  );
+
+  return {
+    x: from.x + deltaX * scale,
+    y: from.y + deltaY * scale,
+  };
+}
+
+function pathFor(edge: VisibleEdge, index: number, edgeCount: number): string {
+  const fromCenter = STATE_POSITIONS[edge.fromState];
+  const toCenter = STATE_POSITIONS[edge.toState];
+  const from = getBorderPoint(fromCenter, toCenter);
+  const to = getBorderPoint(toCenter, fromCenter);
+  const offset = (index - (edgeCount - 1) / 2) * 28;
   const controlX = (from.x + to.x) / 2;
-  const controlY = (from.y + to.y) / 2 - offset;
+  const controlY = (from.y + to.y) / 2 + offset;
 
   return `M ${from.x} ${from.y} Q ${controlX} ${controlY} ${to.x} ${to.y}`;
 }
 
+function groupAvailableTransitions(
+  transitions: StateMachineTransition[],
+  currentState: OrderState,
+  availableEvents: OrderEventType[],
+): VisibleEdge[] {
+  const availableEventSet = new Set(availableEvents);
+  const groupedTransitions = transitions
+    .filter(
+      (transition) =>
+        transition.fromState === currentState &&
+        availableEventSet.has(transition.eventType),
+    )
+    .reduce<Map<OrderState, OrderEventType[]>>((groups, transition) => {
+      const group = groups.get(transition.toState) ?? [];
+      groups.set(transition.toState, [...group, transition.eventType]);
+      return groups;
+    }, new Map());
+
+  return Array.from(groupedTransitions.entries()).map(([toState, eventTypes]) => ({
+    id: `available-${currentState}-${toState}`,
+    fromState: currentState,
+    toState,
+    eventTypes,
+    kind: 'available',
+  }));
+}
+
+function getHistoricalEdges(order: OrderDetail): VisibleEdge[] {
+  return order.history.map((entry, index) => ({
+    id: `historical-${index}-${entry.fromState}-${entry.eventType}-${entry.toState}`,
+    fromState: entry.fromState,
+    toState: entry.toState,
+    eventTypes: [entry.eventType],
+    kind: 'historical',
+  }));
+}
+
+function getNodeStatusText(
+  state: OrderState,
+  currentState: OrderState,
+  visitedStates: Set<OrderState>,
+  availableNextStates: Set<OrderState>,
+  terminalStates: Set<OrderState>,
+): string[] {
+  const statuses: string[] = [];
+
+  if (state === currentState) {
+    statuses.push('Current');
+  }
+
+  if (visitedStates.has(state) && state !== currentState) {
+    statuses.push('Visited');
+  }
+
+  if (availableNextStates.has(state)) {
+    statuses.push('Available');
+  }
+
+  if (terminalStates.has(state)) {
+    statuses.push('Terminal');
+  }
+
+  return statuses;
+}
+
 export function StateMachineDiagram({
+  availableEvents,
   definition,
   error,
   isLoading,
-  selectedState,
+  order,
 }: StateMachineDiagramProps) {
   if (isLoading) {
     return (
@@ -62,21 +163,39 @@ export function StateMachineDiagram({
         className={`${styles.moduleScope} diagram-section`}
         aria-labelledby="diagram-title"
       >
-        <h2 id="diagram-title">State machine</h2>
+        <h2 id="diagram-title">Order journey</h2>
         <EmptyState
           title="State-machine diagram unavailable"
-          message="The dashboard is still usable while the graph request is retried."
+          message="The workspace is still usable while the graph request is retried."
         />
       </section>
     );
   }
 
-  if (!definition) {
+  if (!definition || !order) {
     return null;
   }
 
-  const outgoingStates = new Set(
-    definition.transitions.map((transition) => transition.fromState),
+  const terminalStates = new Set(
+    definition.states.filter(
+      (state) =>
+        !definition.transitions.some((transition) => transition.fromState === state),
+    ),
+  );
+  const historicalEdges = getHistoricalEdges(order);
+  const availableEdges = groupAvailableTransitions(
+    definition.transitions,
+    order.currentState,
+    availableEvents,
+  );
+  const visibleEdges = [...historicalEdges, ...availableEdges];
+  const visitedStates = new Set<OrderState>([order.currentState]);
+  order.history.forEach((entry) => {
+    visitedStates.add(entry.fromState);
+    visitedStates.add(entry.toState);
+  });
+  const availableNextStates = new Set(
+    availableEdges.map((edge) => edge.toState),
   );
 
   return (
@@ -85,14 +204,17 @@ export function StateMachineDiagram({
       aria-labelledby="diagram-title"
     >
       <div className="panel-heading">
-        <h2 id="diagram-title">State machine</h2>
-        <span>{definition.transitions.length} transitions</span>
+        <h2 id="diagram-title">Order journey</h2>
+        <span>{visibleEdges.length} visible transitions</span>
       </div>
 
       <div className="diagram-legend" aria-label="Diagram legend">
-        <span><span className="legend-dot current" /> Current state</span>
-        <span><span className="legend-dot terminal" /> No outgoing events</span>
-        <span><span className="legend-line" /> Backend transition</span>
+        <span><span className="legend-dot current" /> Current</span>
+        <span><span className="legend-dot visited" /> Visited</span>
+        <span><span className="legend-dot available" /> Available next</span>
+        <span><span className="legend-dot terminal" /> Terminal</span>
+        <span><span className="legend-line historical" /> History</span>
+        <span><span className="legend-line available-line" /> Available</span>
       </div>
 
       <div className="diagram-scroll">
@@ -102,7 +224,7 @@ export function StateMachineDiagram({
           role="img"
           aria-labelledby="diagram-svg-title"
         >
-          <title id="diagram-svg-title">Order state-machine diagram</title>
+          <title id="diagram-svg-title">Contextual order journey diagram</title>
           <defs>
             <marker
               id="arrow"
@@ -117,49 +239,71 @@ export function StateMachineDiagram({
             </marker>
           </defs>
           <g className="diagram-links">
-            {definition.transitions.map((transition, index) => {
-              const from = STATE_POSITIONS[transition.fromState];
-              const to = STATE_POSITIONS[transition.toState];
-              const labelX = (from.x + to.x) / 2;
-              const labelY = (from.y + to.y) / 2 - (index % 2 === 0 ? 12 : 28);
+            {visibleEdges.map((edge, index) => {
+              const isCancelledEdge = edge.toState === 'Cancelled';
+              const className = [
+                'diagram-edge',
+                edge.kind === 'historical' ? 'historical-edge' : 'available-edge',
+                isCancelledEdge ? 'cancelled-edge' : '',
+              ].join(' ');
+              const eventLabel = edge.eventTypes.map(formatOrderEvent).join(', ');
 
               return (
-                <g
-                  key={`${transition.fromState}-${transition.eventType}-${transition.toState}`}
+                <path
+                  key={edge.id}
+                  className={className}
+                  d={pathFor(edge, index, visibleEdges.length)}
+                  markerEnd="url(#arrow)"
+                  data-kind={edge.kind}
+                  data-to-state={edge.toState}
                 >
-                  <path
-                    d={pathFor(from, to, index)}
-                    markerEnd="url(#arrow)"
-                    aria-hidden="true"
-                  />
-                  <text x={labelX} y={labelY}>
-                    {formatOrderEvent(transition.eventType)}
-                  </text>
-                </g>
+                  <title>
+                    {edge.kind === 'historical' ? 'Historical' : 'Available'}:{' '}
+                    {formatOrderState(edge.fromState)} to{' '}
+                    {formatOrderState(edge.toState)} by {eventLabel}
+                  </title>
+                </path>
               );
             })}
           </g>
           <g className="diagram-nodes">
             {definition.states.map((state) => {
               const position = STATE_POSITIONS[state];
-              const isCurrent = state === selectedState;
-              const isTerminal = !outgoingStates.has(state);
+              const statuses = getNodeStatusText(
+                state,
+                order.currentState,
+                visitedStates,
+                availableNextStates,
+                terminalStates,
+              );
 
               return (
                 <g
                   key={state}
                   className={[
                     'diagram-node',
-                    isCurrent ? 'current' : '',
-                    isTerminal ? 'terminal' : '',
+                    state === order.currentState ? 'current' : '',
+                    visitedStates.has(state) && state !== order.currentState
+                      ? 'visited'
+                      : '',
+                    availableNextStates.has(state) ? 'available' : '',
+                    terminalStates.has(state) ? 'terminal' : '',
                   ].join(' ')}
-                  transform={`translate(${position.x - 68} ${position.y - 24})`}
+                  data-state={state}
+                  data-status={statuses.join(' ')}
+                  transform={`translate(${position.x - NODE_WIDTH / 2} ${
+                    position.y - NODE_HEIGHT / 2
+                  })`}
                 >
-                  <rect width="136" height="48" rx="8" />
-                  <text x="68" y="29">
+                  <rect width={NODE_WIDTH} height={NODE_HEIGHT} rx="8" />
+                  <text x="68" y="23">
                     {formatOrderState(state)}
                   </text>
-                  {isTerminal ? <circle cx="122" cy="12" r="4" /> : null}
+                  {statuses.length > 0 ? (
+                    <text className="node-status" x="68" y="40">
+                      {statuses.join(' / ')}
+                    </text>
+                  ) : null}
                 </g>
               );
             })}
@@ -167,20 +311,66 @@ export function StateMachineDiagram({
         </svg>
       </div>
 
-      <div className="sr-only">
-        <h3>State-machine transitions</h3>
-        <ul>
-          {definition.transitions.map((transition) => (
-            <li
-              key={`${transition.fromState}-${transition.eventType}-${transition.toState}-text`}
-            >
-              {formatOrderState(transition.fromState)} with{' '}
-              {formatOrderEvent(transition.eventType)} goes to{' '}
-              {formatOrderState(transition.toState)}.
-            </li>
-          ))}
-        </ul>
+      <div className="transition-lists">
+        <section aria-labelledby="available-transitions-title">
+          <h3 id="available-transitions-title">Available transitions</h3>
+          {availableEdges.length === 0 ? (
+            <p className="muted">No available transitions.</p>
+          ) : (
+            <ul>
+              {availableEdges.flatMap((edge) =>
+                edge.eventTypes.map((eventType) => (
+                  <li key={`${edge.id}-${eventType}`}>
+                    {formatOrderEvent(eventType)} &rarr;{' '}
+                    {formatOrderState(edge.toState)}
+                  </li>
+                )),
+              )}
+            </ul>
+          )}
+        </section>
+
+        <section aria-labelledby="historical-transitions-title">
+          <h3 id="historical-transitions-title">Historical path</h3>
+          {historicalEdges.length === 0 ? (
+            <p className="muted">No transitions have been applied yet.</p>
+          ) : (
+            <ul>
+              {historicalEdges.map((edge) => (
+                <li key={`${edge.id}-text`}>
+                  {formatOrderState(edge.fromState)} &rarr;{' '}
+                  {formatOrderState(edge.toState)} by{' '}
+                  {formatOrderEvent(edge.eventTypes[0])}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
+
+      <details className="transition-inventory">
+        <summary>View all backend transitions</summary>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">From</th>
+              <th scope="col">Event</th>
+              <th scope="col">To</th>
+            </tr>
+          </thead>
+          <tbody>
+            {definition.transitions.map((transition) => (
+              <tr
+                key={`${transition.fromState}-${transition.eventType}-${transition.toState}`}
+              >
+                <td>{formatOrderState(transition.fromState)}</td>
+                <td>{formatOrderEvent(transition.eventType)}</td>
+                <td>{formatOrderState(transition.toState)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
     </section>
   );
 }

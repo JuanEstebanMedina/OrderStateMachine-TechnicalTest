@@ -7,7 +7,6 @@ import { formatDateTime } from '../../../../shared/utils/date';
 import { formatCurrency } from '../../utils/orderFormatters';
 import { EmptyState } from '../../../../shared/ui/EmptyState/EmptyState';
 import { LoadingState } from '../../../../shared/ui/LoadingState/LoadingState';
-import { HistoryTimeline } from '../HistoryTimeline/HistoryTimeline';
 import { StateBadge } from '../StateBadge/StateBadge';
 
 type OrderDetailProps = {
@@ -36,15 +35,15 @@ export function OrderDetail({ error, isLoading, order }: OrderDetailProps) {
         className={`${styles.moduleScope} panel detail-panel`}
         aria-labelledby="order-detail-title"
       >
-        <h2 id="order-detail-title">Order detail</h2>
+        <h2 id="order-detail-title">Order workspace</h2>
         {error ? (
           <div className="inline-error" role="alert">
             {error}
           </div>
         ) : (
           <EmptyState
-            title="Select an order"
-            message="Choose an order from the list to inspect its state and history."
+            title="Order unavailable"
+            message="The selected order could not be loaded."
           />
         )}
       </section>
@@ -67,7 +66,7 @@ export function OrderDetail({ error, isLoading, order }: OrderDetailProps) {
       aria-labelledby="order-detail-title"
     >
       <div className="panel-heading">
-        <h2 id="order-detail-title">Order detail</h2>
+        <h2 id="order-detail-title">Order identity</h2>
         <StateBadge state={order.currentState} />
       </div>
 
@@ -118,11 +117,6 @@ export function OrderDetail({ error, isLoading, order }: OrderDetailProps) {
         {order.productIds.map((productId) => (
           <span key={productId}>{productId}</span>
         ))}
-      </div>
-
-      <div className="history-section">
-        <h3>History</h3>
-        <HistoryTimeline history={order.history} />
       </div>
     </section>
   );

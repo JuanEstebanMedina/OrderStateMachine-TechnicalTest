@@ -23,6 +23,18 @@ CORS_ALLOWED_ORIGINS=http://localhost:5173
 
 No Vite proxy is used.
 
+The app is a single-page operations dashboard without routing. The overview
+shows summaries, create-order controls, a direct full UUID lookup, and order
+cards. Opening an order switches to the workspace for detail, backend-returned
+available events, history, and a contextual state-machine diagram. The diagram
+shows visited and currently available edges by default, with the complete
+backend transition inventory in a disclosure.
+
+Create-order input trims product IDs, removes duplicates, and requires a
+positive finite amount before submitting to the API. Runtime `.env` files and
+build output are intentionally ignored; keep using `.env.example` as the shared
+template.
+
 ## Validation
 
 ```bash

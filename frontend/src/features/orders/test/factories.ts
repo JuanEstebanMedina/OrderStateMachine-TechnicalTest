@@ -21,6 +21,7 @@ export const secondSummary: OrderSummary = {
 
 export const baseDetail: OrderDetail = {
   ...baseSummary,
+  currentState: 'PendingPayment',
   history: [
     {
       eventType: 'noVerificationNeeded',
@@ -32,6 +33,54 @@ export const baseDetail: OrderDetail = {
   ],
 };
 
+export const secondDetail: OrderDetail = {
+  ...secondSummary,
+  history: [
+    {
+      eventType: 'noVerificationNeeded',
+      fromState: 'Pending',
+      toState: 'PendingPayment',
+      metadata: {},
+      createdAt: '2026-06-13T13:01:00Z',
+    },
+    {
+      eventType: 'paymentSuccessful',
+      fromState: 'PendingPayment',
+      toState: 'Confirmed',
+      metadata: {},
+      createdAt: '2026-06-13T13:02:00Z',
+    },
+    {
+      eventType: 'preparingShipment',
+      fromState: 'Confirmed',
+      toState: 'Processing',
+      metadata: {},
+      createdAt: '2026-06-13T13:03:00Z',
+    },
+    {
+      eventType: 'itemDispatched',
+      fromState: 'Processing',
+      toState: 'Shipped',
+      metadata: {},
+      createdAt: '2026-06-13T13:04:00Z',
+    },
+  ],
+};
+
+export const cancelledDetail: OrderDetail = {
+  ...baseSummary,
+  currentState: 'Cancelled',
+  history: [
+    {
+      eventType: 'paymentFailed',
+      fromState: 'Pending',
+      toState: 'Cancelled',
+      metadata: {},
+      createdAt: '2026-06-13T12:03:00Z',
+    },
+  ],
+};
+
 export const emptyHistoryDetail: OrderDetail = {
   ...baseSummary,
   history: [],
@@ -39,7 +88,19 @@ export const emptyHistoryDetail: OrderDetail = {
 
 export const stateMachineDefinition: StateMachineDefinition = {
   initialState: 'Pending',
-  states: ['Pending', 'PendingPayment', 'Cancelled'],
+  states: [
+    'Pending',
+    'OnHold',
+    'PendingPayment',
+    'Confirmed',
+    'Processing',
+    'Shipped',
+    'Delivered',
+    'Returning',
+    'Returned',
+    'Refunded',
+    'Cancelled',
+  ],
   transitions: [
     {
       fromState: 'Pending',
@@ -50,6 +111,41 @@ export const stateMachineDefinition: StateMachineDefinition = {
       fromState: 'Pending',
       eventType: 'orderCancelledByUser',
       toState: 'Cancelled',
+    },
+    {
+      fromState: 'Pending',
+      eventType: 'pendingBiometricalVerification',
+      toState: 'OnHold',
+    },
+    {
+      fromState: 'Pending',
+      eventType: 'paymentFailed',
+      toState: 'Cancelled',
+    },
+    {
+      fromState: 'Pending',
+      eventType: 'orderCancelled',
+      toState: 'Cancelled',
+    },
+    {
+      fromState: 'PendingPayment',
+      eventType: 'paymentSuccessful',
+      toState: 'Confirmed',
+    },
+    {
+      fromState: 'PendingPayment',
+      eventType: 'orderCancelledByUser',
+      toState: 'Cancelled',
+    },
+    {
+      fromState: 'Confirmed',
+      eventType: 'preparingShipment',
+      toState: 'Processing',
+    },
+    {
+      fromState: 'Processing',
+      eventType: 'itemDispatched',
+      toState: 'Shipped',
     },
   ],
 };

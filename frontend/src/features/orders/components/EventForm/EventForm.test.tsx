@@ -22,12 +22,19 @@ function createConflictError() {
 }
 
 describe('EventForm', () => {
+  const defaultProps = {
+    isDisabled: false,
+    isLoading: false,
+    isSubmitting: false,
+    loadError: null,
+    onRetry: vi.fn(),
+  };
+
   it('renders only events returned by the backend', () => {
     render(
       <EventForm
+        {...defaultProps}
         availableEvents={['noVerificationNeeded']}
-        isDisabled={false}
-        isSubmitting={false}
         onApply={vi.fn()}
       />,
     );
@@ -43,9 +50,8 @@ describe('EventForm', () => {
   it('renders the no-events state', () => {
     render(
       <EventForm
+        {...defaultProps}
         availableEvents={[]}
-        isDisabled={false}
-        isSubmitting={false}
         onApply={vi.fn()}
       />,
     );
@@ -61,9 +67,8 @@ describe('EventForm', () => {
 
     render(
       <EventForm
+        {...defaultProps}
         availableEvents={['noVerificationNeeded']}
-        isDisabled={false}
-        isSubmitting={false}
         onApply={onApply}
       />,
     );
@@ -83,9 +88,8 @@ describe('EventForm', () => {
 
     render(
       <EventForm
+        {...defaultProps}
         availableEvents={['noVerificationNeeded']}
-        isDisabled={false}
-        isSubmitting={false}
         onApply={onApply}
       />,
     );
@@ -112,9 +116,8 @@ describe('EventForm', () => {
 
     render(
       <EventForm
+        {...defaultProps}
         availableEvents={['noVerificationNeeded', 'paymentFailed']}
-        isDisabled={false}
-        isSubmitting={false}
         onApply={onApply}
       />,
     );
@@ -137,9 +140,8 @@ describe('EventForm', () => {
 
     render(
       <EventForm
+        {...defaultProps}
         availableEvents={['noVerificationNeeded']}
-        isDisabled={false}
-        isSubmitting={false}
         onApply={onApply}
       />,
     );
@@ -151,5 +153,38 @@ describe('EventForm', () => {
         /invalid order transition/i,
       );
     });
+  });
+
+  it('shows available-events loading and retry error independently', async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+
+    const { rerender } = render(
+      <EventForm
+        {...defaultProps}
+        availableEvents={[]}
+        isLoading
+        onApply={vi.fn()}
+        onRetry={onRetry}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent(/loading available/i);
+
+    rerender(
+      <EventForm
+        {...defaultProps}
+        availableEvents={[]}
+        loadError="Available events failed"
+        onApply={vi.fn()}
+        onRetry={onRetry}
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/available events failed/i);
+    await user.click(
+      screen.getByRole('button', { name: /retry available events/i }),
+    );
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

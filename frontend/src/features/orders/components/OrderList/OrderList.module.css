@@ -97,50 +97,65 @@
   color: var(--color-text-strong);
 }
 
-:global(.table-wrap) {
-  overflow-x: auto;
-}
-
-:global(.orders-table) {
-  width: 100%;
-  min-width: 620px;
-  border-collapse: collapse;
-}
-
-:global(.orders-table th),
-:global(.orders-table td) {
-  padding: 12px 10px;
-  border-bottom: 1px solid var(--color-border);
-  text-align: left;
-  vertical-align: middle;
-}
-
-:global(.orders-table th) {
-  color: var(--color-text-muted);
-  font-size: 0.78rem;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-:global(.orders-table tr:last-child td) {
-  border-bottom: 0;
-}
-
-:global(.selected-row) {
-  background: rgba(20, 184, 166, 0.08);
-}
-
-:global(.link-button) {
+:global(.order-card-list) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--space-3);
+  margin: 0;
   padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-accent-strong);
-  font: inherit;
-  font-weight: 800;
+  list-style: none;
+}
+
+:global(.order-card) {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+:global(.selected-order-card) {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.16);
+}
+
+:global(.order-card-header) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+:global(.order-card h3) {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 1.15rem;
   letter-spacing: 0;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
+}
+
+:global(.order-card-facts) {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+:global(.order-card-facts div) {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+:global(.order-card-facts dd) {
+  margin: 0;
+  color: var(--color-text-strong);
+  text-align: right;
+}
+
+:global(.order-card-action) {
+  width: 100%;
 }
 
 @media (max-width: 640px) {

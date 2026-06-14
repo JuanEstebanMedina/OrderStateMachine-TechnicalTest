@@ -109,45 +109,48 @@ export function OrderList({
       ) : null}
 
       {filteredOrders.length > 0 ? (
-        <div className="table-wrap">
-          <table className="orders-table">
-            <thead>
-              <tr>
-                <th scope="col">Order</th>
-                <th scope="col">Products</th>
-                <th scope="col">Amount</th>
-                <th scope="col">State</th>
-                <th scope="col">Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.map((order) => (
-                <tr
-                  key={order.orderId}
-                  className={
-                    order.orderId === selectedOrderId ? 'selected-row' : undefined
-                  }
+        <ul className="order-card-list" aria-label="Order cards">
+          {filteredOrders.map((order) => (
+            <li key={order.orderId}>
+              <article
+                className={[
+                  'order-card',
+                  order.orderId === selectedOrderId ? 'selected-order-card' : '',
+                ].join(' ')}
+              >
+                <div className="order-card-header">
+                  <div>
+                    <p className="eyebrow">Order</p>
+                    <h3>{formatShortOrderId(order.orderId)}</h3>
+                  </div>
+                  <StateBadge state={order.currentState} />
+                </div>
+                <dl className="order-card-facts">
+                  <div>
+                    <dt>Products</dt>
+                    <dd>{order.productIds.length}</dd>
+                  </div>
+                  <div>
+                    <dt>Amount</dt>
+                    <dd>{formatCurrency(order.amount)}</dd>
+                  </div>
+                  <div>
+                    <dt>Updated</dt>
+                    <dd>{formatDateTime(order.updatedAt)}</dd>
+                  </div>
+                </dl>
+                <button
+                  type="button"
+                  aria-label={`Open order ${order.orderId}`}
+                  className="button secondary order-card-action"
+                  onClick={() => onSelect(order.orderId)}
                 >
-                  <td>
-                    <button
-                      type="button"
-                      className="link-button"
-                      onClick={() => onSelect(order.orderId)}
-                    >
-                      {formatShortOrderId(order.orderId)}
-                    </button>
-                  </td>
-                  <td>{order.productIds.length}</td>
-                  <td>{formatCurrency(order.amount)}</td>
-                  <td>
-                    <StateBadge state={order.currentState} />
-                  </td>
-                  <td>{formatDateTime(order.updatedAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  Open order
+                </button>
+              </article>
+            </li>
+          ))}
+        </ul>
       ) : null}
     </section>
   );

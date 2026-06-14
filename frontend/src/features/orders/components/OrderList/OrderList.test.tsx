@@ -5,6 +5,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { baseSummary, secondSummary } from '../../test/factories';
 import { OrderList } from './OrderList';
 
+function openOrderName(orderId: string) {
+  return new RegExp(`open order\\s+${orderId}`, 'i');
+}
+
 function renderOrderList(onSelect = vi.fn()) {
   render(
     <OrderList
@@ -24,6 +28,7 @@ describe('OrderList', () => {
   it('renders summaries', () => {
     renderOrderList();
 
+    expect(screen.getByRole('list', { name: /order cards/i })).toBeInTheDocument();
     expect(screen.getByText('11111111')).toBeInTheDocument();
     expect(screen.getByText('22222222')).toBeInTheDocument();
     expect(screen.getAllByText('Pending').length).toBeGreaterThan(0);
@@ -64,7 +69,11 @@ describe('OrderList', () => {
     const user = userEvent.setup();
     const onSelect = renderOrderList();
 
-    await user.click(screen.getByRole('button', { name: '22222222' }));
+    await user.click(
+      screen.getByRole('button', {
+        name: openOrderName(secondSummary.orderId),
+      }),
+    );
 
     expect(onSelect).toHaveBeenCalledWith(secondSummary.orderId);
   });
