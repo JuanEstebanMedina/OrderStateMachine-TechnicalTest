@@ -1,0 +1,40 @@
+.moduleScope {
+}
+
+:global(.feedback) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 40px;
+  margin-bottom: var(--space-4);
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+}
+
+:global(.feedback-success) {
+  border-color: rgba(22, 163, 74, 0.28);
+  color: #166534;
+}
+
+:global(.feedback-error) {
+  border-color: rgba(220, 38, 38, 0.28);
+  color: #991b1b;
+}
+
+:global(.icon-button) {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  letter-spacing: 0;
+  cursor: pointer;
+}
