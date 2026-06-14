@@ -1,3 +1,4 @@
+from collections.abc import Generator
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -17,7 +18,7 @@ class ApiTestContext:
 
 
 @pytest.fixture
-def api_context() -> ApiTestContext:
+def api_context() -> Generator[ApiTestContext, None, None]:
     order_repository = InMemoryOrderRepository()
     support_ticket_repository = InMemorySupportTicketRepository()
     service = OrderService(
@@ -72,7 +73,7 @@ def test_create_order(api_context: ApiTestContext) -> None:
     data = response.json()
     assert UUID(data["orderId"])
     assert data["productIds"] == ["product-1", "product-2"]
-    assert data["amount"] == 1200.5
+    assert data["amount"] == pytest.approx(1200.5)
     assert data["currentState"] == "Pending"
     assert data["history"] == []
     assert "createdAt" in data
