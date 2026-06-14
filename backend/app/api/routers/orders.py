@@ -3,10 +3,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 
-from app.dependencies import get_order_service
+from app.dependencies import get_order_service, get_state_machine
 from app.domain import Order
-from app.schemas import ApplyOrderEventRequest, CreateOrderRequest, OrderResponse
-from app.services import OrderService
+from app.schemas import (
+    ApplyOrderEventRequest,
+    AvailableEventsResponse,
+    CreateOrderRequest,
+    OrderResponse,
+    OrderSummaryResponse,
+)
+from app.services import OrderService, OrderStateMachine
 
 
 router = APIRouter(
@@ -26,7 +32,7 @@ def create_order(
     )
 
 
-@router.get("", response_model=list[OrderResponse])
+@router.get("", response_model=list[OrderSummaryResponse])
 def list_orders(
     order_service: Annotated[OrderService, Depends(get_order_service)],
 ) -> list[Order]:
@@ -39,6 +45,18 @@ def get_order(
     order_service: Annotated[OrderService, Depends(get_order_service)],
 ) -> Order:
     return order_service.get_order(order_id)
+
+
+@router.get("/{order_id}/available-events", response_model=AvailableEventsResponse)
+def get_available_events(
+    order_id: UUID,
+    order_service: Annotated[OrderService, Depends(get_order_service)],
+    state_machine: Annotated[OrderStateMachine, Depends(get_state_machine)],
+) -> AvailableEventsResponse:
+    order = order_service.get_order(order_id)
+    return AvailableEventsResponse(
+        events=state_machine.get_available_events(order.current_state),
+    )
 
 
 @router.post("/{order_id}/events", response_model=OrderResponse)

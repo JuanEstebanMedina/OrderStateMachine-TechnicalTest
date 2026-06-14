@@ -1,4 +1,13 @@
+from dataclasses import dataclass
+
 from app.domain import InvalidOrderTransitionError, OrderEventType, OrderState
+
+
+@dataclass(frozen=True)
+class OrderTransitionDefinition:
+    from_state: OrderState
+    event_type: OrderEventType
+    to_state: OrderState
 
 
 class OrderStateMachine:
@@ -35,6 +44,8 @@ class OrderStateMachine:
         **_specific_transitions,
         **_user_cancellation_transitions,
     }
+    _state_order = {state: index for index, state in enumerate(OrderState)}
+    _event_order = {event_type: index for index, event_type in enumerate(OrderEventType)}
 
     def get_next_state(
         self,
@@ -45,3 +56,35 @@ class OrderStateMachine:
             return self._transitions[(current_state, event_type)]
         except KeyError as error:
             raise InvalidOrderTransitionError(current_state, event_type) from error
+
+    def get_available_events(
+        self,
+        state: OrderState,
+    ) -> list[OrderEventType]:
+        events = [
+            event_type
+            for (from_state, event_type), _to_state in self._transitions.items()
+            if from_state == state and event_type != OrderEventType.INIT
+        ]
+
+        return sorted(events, key=lambda event_type: self._event_order[event_type])
+
+    def get_transition_definitions(self) -> list[OrderTransitionDefinition]:
+        transitions = [
+            OrderTransitionDefinition(
+                from_state=from_state,
+                event_type=event_type,
+                to_state=to_state,
+            )
+            for (from_state, event_type), to_state in self._transitions.items()
+            if event_type != OrderEventType.INIT
+        ]
+
+        return sorted(
+            transitions,
+            key=lambda transition: (
+                self._state_order[transition.from_state],
+                self._event_order[transition.event_type],
+                self._state_order[transition.to_state],
+            ),
+        )

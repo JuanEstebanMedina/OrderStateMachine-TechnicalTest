@@ -162,3 +162,83 @@ def test_pending_payment_cannot_dispatch_item() -> None:
             OrderState.PENDING_PAYMENT,
             OrderEventType.ITEM_DISPATCHED,
         )
+
+
+@pytest.mark.parametrize(
+    ("state", "expected_events"),
+    [
+        (
+            OrderState.PENDING,
+            [
+                OrderEventType.PENDING_BIOMETRICAL_VERIFICATION,
+                OrderEventType.NO_VERIFICATION_NEEDED,
+                OrderEventType.PAYMENT_FAILED,
+                OrderEventType.ORDER_CANCELLED,
+                OrderEventType.ORDER_CANCELLED_BY_USER,
+            ],
+        ),
+        (
+            OrderState.ON_HOLD,
+            [
+                OrderEventType.BIOMETRICAL_VERIFICATION_SUCCESSFUL,
+                OrderEventType.VERIFICATION_FAILED,
+                OrderEventType.ORDER_CANCELLED_BY_USER,
+            ],
+        ),
+        (
+            OrderState.SHIPPED,
+            [
+                OrderEventType.ORDER_CANCELLED_BY_USER,
+                OrderEventType.ITEM_RECEIVED_BY_CUSTOMER,
+                OrderEventType.DELIVERY_ISSUE,
+            ],
+        ),
+        (
+            OrderState.DELIVERED,
+            [OrderEventType.RETURN_INITIATED_BY_CUSTOMER],
+        ),
+        (OrderState.REFUNDED, []),
+        (OrderState.CANCELLED, []),
+    ],
+)
+def test_get_available_events_returns_real_user_events_for_state(
+    state: OrderState,
+    expected_events: list[OrderEventType],
+) -> None:
+    state_machine = OrderStateMachine()
+
+    available_events = state_machine.get_available_events(state)
+
+    assert available_events == expected_events
+    assert OrderEventType.INIT not in available_events
+
+
+def test_get_available_events_returns_a_new_list() -> None:
+    state_machine = OrderStateMachine()
+
+    first_result = state_machine.get_available_events(OrderState.PENDING)
+    second_result = state_machine.get_available_events(OrderState.PENDING)
+
+    assert first_result is not second_result
+
+
+def test_transition_definitions_are_derived_from_real_transitions() -> None:
+    state_machine = OrderStateMachine()
+
+    transitions = state_machine.get_transition_definitions()
+
+    assert any(
+        transition.from_state == OrderState.PENDING
+        and transition.event_type == OrderEventType.NO_VERIFICATION_NEEDED
+        and transition.to_state == OrderState.PENDING_PAYMENT
+        for transition in transitions
+    )
+    assert any(
+        transition.from_state == OrderState.SHIPPED
+        and transition.event_type == OrderEventType.ORDER_CANCELLED_BY_USER
+        and transition.to_state == OrderState.CANCELLED
+        for transition in transitions
+    )
+    assert not any(
+        transition.event_type == OrderEventType.INIT for transition in transitions
+    )

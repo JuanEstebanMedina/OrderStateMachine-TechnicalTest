@@ -34,6 +34,20 @@ class OrderEventLogResponse(BaseModel):
     )
 
 
+class OrderSummaryResponse(BaseModel):
+    id: UUID = Field(alias="orderId")
+    product_ids: list[str] = Field(alias="productIds")
+    amount: float
+    current_state: OrderState = Field(alias="currentState")
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+    )
+
+
 class OrderResponse(BaseModel):
     id: UUID = Field(alias="orderId")
     product_ids: list[str] = Field(alias="productIds")
@@ -47,3 +61,26 @@ class OrderResponse(BaseModel):
         from_attributes=True,
         populate_by_name=True,
     )
+
+
+class AvailableEventsResponse(BaseModel):
+    events: list[OrderEventType]
+
+
+class StateMachineTransitionResponse(BaseModel):
+    from_state: OrderState = Field(alias="fromState")
+    event_type: OrderEventType = Field(alias="eventType")
+    to_state: OrderState = Field(alias="toState")
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+    )
+
+
+class StateMachineDefinitionResponse(BaseModel):
+    initial_state: OrderState = Field(alias="initialState")
+    states: list[OrderState]
+    transitions: list[StateMachineTransitionResponse]
+
+    model_config = ConfigDict(populate_by_name=True)
