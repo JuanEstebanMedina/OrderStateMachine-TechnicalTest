@@ -133,6 +133,80 @@ def test_create_order(api_context: ApiTestContext) -> None:
     assert "current_state" not in data
 
 
+def test_create_order_rejects_empty_product_ids(
+    api_context: ApiTestContext,
+) -> None:
+    response = api_context.client.post(
+        "/orders",
+        json={"productIds": [], "amount": 1200.5},
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_order_rejects_whitespace_product_id(
+    api_context: ApiTestContext,
+) -> None:
+    response = api_context.client.post(
+        "/orders",
+        json={"productIds": ["product-1", "   "], "amount": 1200.5},
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_order_trims_product_ids(api_context: ApiTestContext) -> None:
+    response = api_context.client.post(
+        "/orders",
+        json={"productIds": [" product-1 ", "\tproduct-2\n"], "amount": 1200.5},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["productIds"] == ["product-1", "product-2"]
+
+
+def test_create_order_removes_duplicate_product_ids_preserving_order(
+    api_context: ApiTestContext,
+) -> None:
+    response = api_context.client.post(
+        "/orders",
+        json={
+            "productIds": ["product-1", "product-2", "product-1", " product-2 "],
+            "amount": 1200.5,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["productIds"] == ["product-1", "product-2"]
+
+
+@pytest.mark.parametrize("amount", [0, -1, -1200.5])
+def test_create_order_rejects_non_positive_amount(
+    api_context: ApiTestContext,
+    amount: float,
+) -> None:
+    response = api_context.client.post(
+        "/orders",
+        json={"productIds": ["product-1"], "amount": amount},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("amount_literal", ["NaN", "Infinity", "-Infinity"])
+def test_create_order_rejects_non_finite_amount_when_representable(
+    api_context: ApiTestContext,
+    amount_literal: str,
+) -> None:
+    response = api_context.client.post(
+        "/orders",
+        content=f'{{"productIds":["product-1"],"amount":{amount_literal}}}',
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 422
+
+
 def test_list_orders(api_context: ApiTestContext) -> None:
     first_order = create_order(api_context.client)
     second_order = create_order(api_context.client, amount=300.0)
