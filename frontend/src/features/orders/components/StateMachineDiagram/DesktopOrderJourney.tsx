@@ -180,7 +180,7 @@ export function DesktopOrderJourney({
                   })`}
                 >
                   <rect width={NODE_WIDTH} height={NODE_HEIGHT} rx="8" />
-                  <text x="68" y="23">
+                  <text className={styles.nodeTitle} x="68" y="23">
                     {formatOrderState(state)}
                   </text>
                   {statuses.length > 0 ? (
