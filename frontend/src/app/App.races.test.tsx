@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -19,19 +19,25 @@ import {
   applyOrderEvent,
   deferred,
   getAvailableEvents,
+  getHealth,
   getOrder,
+  getStateMachineDefinition,
+  listOrders,
   openFirstOrder,
   openOrderName,
   renderOverview,
 } from '../test/appTestUtils';
+import App from './App';
 import {
   baseDetail,
   baseSummary,
   secondDetail,
   secondSummary,
+  stateMachineDefinition,
 } from '../features/orders/test/factories';
 import type { OrderEventType } from '../features/orders/model/orderEvents';
 import type { OrderDetail } from '../features/orders/model/order.types';
+import type { StateMachineDefinition } from '../features/orders/model/stateMachine.types';
 import { createApiError } from '../test/appTestUtils';
 
 describe('App race-condition behavior', () => {
@@ -142,6 +148,175 @@ describe('App race-condition behavior', () => {
     await waitFor(() => {
       expect(screen.queryByText(/old events failed/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/loading available events/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('aborts initialization requests when the app unmounts', async () => {
+    let healthSignal: AbortSignal | undefined;
+    let summariesSignal: AbortSignal | undefined;
+    let stateMachineSignal: AbortSignal | undefined;
+
+    vi.mocked(getHealth).mockImplementation((signal?: AbortSignal) => {
+      healthSignal = signal;
+      return new Promise(() => undefined);
+    });
+    vi.mocked(listOrders).mockImplementation((signal?: AbortSignal) => {
+      summariesSignal = signal;
+      return new Promise(() => undefined);
+    });
+    vi.mocked(getStateMachineDefinition).mockImplementation(
+      (signal?: AbortSignal) => {
+        stateMachineSignal = signal;
+        return new Promise(() => undefined);
+      },
+    );
+
+    const { unmount } = render(<App />);
+
+    await waitFor(() => {
+      expect(healthSignal).toBeDefined();
+      expect(summariesSignal).toBeDefined();
+      expect(stateMachineSignal).toBeDefined();
+    });
+
+    unmount();
+
+    expect(healthSignal?.aborted).toBe(true);
+    expect(summariesSignal?.aborted).toBe(true);
+    expect(stateMachineSignal?.aborted).toBe(true);
+    expect(screen.queryByText(/network error/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/cancel/i)).not.toBeInTheDocument();
+  });
+
+  it('aborts stale workspace GET requests and keeps the newer order visible', async () => {
+    const user = userEvent.setup();
+    const detailA = deferred<OrderDetail>();
+    const eventsA = deferred<OrderEventType[]>();
+    let detailSignalA: AbortSignal | undefined;
+    let eventsSignalA: AbortSignal | undefined;
+
+    await renderOverview();
+    vi.mocked(getOrder).mockImplementation(
+      (orderId: string, signal?: AbortSignal) => {
+        if (orderId === baseSummary.orderId) {
+          detailSignalA = signal;
+          return detailA.promise;
+        }
+
+        return Promise.resolve(secondDetail);
+      },
+    );
+    vi.mocked(getAvailableEvents).mockImplementation(
+      (orderId: string, signal?: AbortSignal) => {
+        if (orderId === baseSummary.orderId) {
+          eventsSignalA = signal;
+          return eventsA.promise;
+        }
+
+        return Promise.resolve(['itemReceivedByCustomer']);
+      },
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: openOrderName(baseSummary.orderId) }),
+    );
+    await waitFor(() => {
+      expect(detailSignalA).toBeDefined();
+      expect(eventsSignalA).toBeDefined();
+    });
+
+    await user.click(screen.getByRole('button', { name: /back to orders/i }));
+    await user.click(
+      screen.getByRole('button', { name: openOrderName(secondSummary.orderId) }),
+    );
+
+    expect(detailSignalA?.aborted).toBe(true);
+    expect(eventsSignalA?.aborted).toBe(true);
+
+    expect(await screen.findByText(secondDetail.orderId)).toBeInTheDocument();
+    detailA.resolve(baseDetail);
+    eventsA.reject(createApiError(500, 'Old workspace failed'));
+
+    await waitFor(() => {
+      expect(screen.getByText(secondDetail.orderId)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(baseDetail.orderId)).not.toBeInTheDocument();
+    expect(screen.queryByText(/old workspace failed/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps workspace and diagram refreshes visible when summaries fail', async () => {
+    const user = userEvent.setup();
+    const refreshedDetail: OrderDetail = {
+      ...baseDetail,
+      amount: 333,
+      updatedAt: '2026-06-13T12:30:00Z',
+    };
+    const refreshedDefinition: StateMachineDefinition = {
+      ...stateMachineDefinition,
+      transitions: [
+        ...stateMachineDefinition.transitions,
+        {
+          fromState: 'Confirmed',
+          eventType: 'customInspectionPassed',
+          toState: 'Processing',
+        },
+      ],
+    };
+
+    await renderOverview();
+    await openFirstOrder(user);
+    vi.mocked(getHealth).mockResolvedValueOnce({ status: 'ok' });
+    vi.mocked(listOrders).mockRejectedValueOnce(
+      createApiError(500, 'Summaries failed'),
+    );
+    vi.mocked(getStateMachineDefinition).mockResolvedValueOnce(refreshedDefinition);
+    vi.mocked(getOrder).mockResolvedValueOnce(refreshedDetail);
+    vi.mocked(getAvailableEvents).mockResolvedValueOnce(['preparingShipment']);
+
+    await user.click(screen.getByRole('button', { name: /^refresh$/i }));
+
+    expect(await screen.findByText(/333/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: /preparing shipment/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/custom inspection passed/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^refresh$/i })).toBeEnabled();
+    });
+  });
+
+  it('keeps overview refreshes visible when workspace refresh fails', async () => {
+    const user = userEvent.setup();
+    const refreshedDefinition: StateMachineDefinition = {
+      ...stateMachineDefinition,
+      transitions: [
+        ...stateMachineDefinition.transitions,
+        {
+          fromState: 'Confirmed',
+          eventType: 'customFlowResumed',
+          toState: 'Processing',
+        },
+      ],
+    };
+
+    await renderOverview();
+    await openFirstOrder(user);
+    vi.mocked(getHealth).mockResolvedValueOnce({ status: 'ok' });
+    vi.mocked(listOrders).mockResolvedValueOnce([baseSummary, secondSummary]);
+    vi.mocked(getStateMachineDefinition).mockResolvedValueOnce(refreshedDefinition);
+    vi.mocked(getOrder).mockRejectedValueOnce(
+      createApiError(500, 'Workspace refresh failed'),
+    );
+    vi.mocked(getAvailableEvents).mockResolvedValueOnce(['paymentSuccessful']);
+
+    await user.click(screen.getByRole('button', { name: /^refresh$/i }));
+
+    expect(
+      (await screen.findAllByText(/workspace refresh failed/i)).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText(/custom flow resumed/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^refresh$/i })).toBeEnabled();
     });
   });
 });

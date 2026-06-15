@@ -47,7 +47,10 @@ describe('App overview flow', () => {
 
     expect(screen.getByRole('button', { name: /back to orders/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /order identity/i })).toBeInTheDocument();
-    expect(getOrder).toHaveBeenCalledWith(baseSummary.orderId);
+    expect(getOrder).toHaveBeenCalledWith(
+      baseSummary.orderId,
+      expect.any(AbortSignal),
+    );
   });
 
   it('submitting a valid full UUID opens the workspace', async () => {
@@ -60,7 +63,10 @@ describe('App overview flow', () => {
     expect(
       await screen.findByRole('button', { name: /back to orders/i }),
     ).toBeInTheDocument();
-    expect(getOrder).toHaveBeenCalledWith(baseSummary.orderId);
+    expect(getOrder).toHaveBeenCalledWith(
+      baseSummary.orderId,
+      expect.any(AbortSignal),
+    );
   });
 
   it('rejects an invalid UUID before calling the API', async () => {

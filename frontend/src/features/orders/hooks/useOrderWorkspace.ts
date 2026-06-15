@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { applyOrderEvent, getAvailableEvents, getOrder } from '../api/ordersApi';
 import type { OrderEventType } from '../model/orderEvents';
@@ -6,7 +6,11 @@ import type {
   ApplyOrderEventRequest,
   OrderDetail,
 } from '../model/order.types';
-import { getApiErrorMessage, getApiErrorStatus } from '../../../shared/api/apiError';
+import {
+  getApiErrorMessage,
+  getApiErrorStatus,
+  isApiCancelError,
+} from '../../../shared/api/apiError';
 import type { FeedbackMessage } from '../../../shared/types/feedback';
 
 type WorkspaceLoadingState = {
@@ -25,7 +29,12 @@ type WorkspaceLoadOptions = {
   generation: number;
   orderId: string;
   resetDetail: boolean;
+  signal: AbortSignal;
 };
+
+function isCancelled(error: unknown, signal?: AbortSignal) {
+  return signal?.aborted || isApiCancelError(error);
+}
 
 export function useOrderWorkspace({
   refreshSummaries,
@@ -46,6 +55,7 @@ export function useOrderWorkspace({
   });
   const selectionGeneration = useRef(0);
   const selectedOrderIdRef = useRef<string | null>(null);
+  const workspaceLoadController = useRef<AbortController | null>(null);
 
   const updateLoading = useCallback((updates: Partial<WorkspaceLoadingState>) => {
     setLoading((current) => ({ ...current, ...updates }));
@@ -62,13 +72,25 @@ export function useOrderWorkspace({
     return selectionGeneration.current;
   }, []);
 
+  const abortWorkspaceLoad = useCallback(() => {
+    workspaceLoadController.current?.abort();
+    workspaceLoadController.current = null;
+  }, []);
+
+  const startWorkspaceLoad = useCallback(() => {
+    abortWorkspaceLoad();
+    const controller = new AbortController();
+    workspaceLoadController.current = controller;
+    return controller;
+  }, [abortWorkspaceLoad]);
+
   const loadAvailableEventsForSelection = useCallback(
-    async (orderId: string, generation: number) => {
+    async (orderId: string, generation: number, signal?: AbortSignal) => {
       updateLoading({ availableEvents: true });
       setAvailableEventsError(null);
 
       try {
-        const events = await getAvailableEvents(orderId);
+        const events = await getAvailableEvents(orderId, signal);
 
         if (!isCurrentSelection(orderId, generation)) {
           return events;
@@ -77,6 +99,10 @@ export function useOrderWorkspace({
         setAvailableEvents(events);
         return events;
       } catch (error) {
+        if (isCancelled(error, signal)) {
+          return [];
+        }
+
         if (isCurrentSelection(orderId, generation)) {
           setAvailableEvents([]);
           setAvailableEventsError(getApiErrorMessage(error));
@@ -84,7 +110,7 @@ export function useOrderWorkspace({
 
         throw error;
       } finally {
-        if (isCurrentSelection(orderId, generation)) {
+        if (!signal?.aborted && isCurrentSelection(orderId, generation)) {
           updateLoading({ availableEvents: false });
         }
       }
@@ -93,7 +119,12 @@ export function useOrderWorkspace({
   );
 
   const loadWorkspaceOrder = useCallback(
-    async ({ orderId, generation, resetDetail }: WorkspaceLoadOptions) => {
+    async ({
+      orderId,
+      generation,
+      resetDetail,
+      signal,
+    }: WorkspaceLoadOptions) => {
       if (resetDetail) {
         setSelectedOrder(null);
         setAvailableEvents([]);
@@ -103,7 +134,7 @@ export function useOrderWorkspace({
       setAvailableEventsError(null);
       updateLoading({ detail: true, availableEvents: true, event: false });
 
-      const detailPromise = getOrder(orderId)
+      const detailPromise = getOrder(orderId, signal)
         .then((order) => {
           if (isCurrentSelection(orderId, generation)) {
             setSelectedOrder(order);
@@ -113,6 +144,10 @@ export function useOrderWorkspace({
           return order;
         })
         .catch(async (error: unknown) => {
+          if (isCancelled(error, signal)) {
+            return Promise.reject(error);
+          }
+
           if (isCurrentSelection(orderId, generation)) {
             const message = getApiErrorMessage(error);
             setDetailError(message);
@@ -130,18 +165,26 @@ export function useOrderWorkspace({
           return Promise.reject(error);
         })
         .finally(() => {
-          if (isCurrentSelection(orderId, generation)) {
+          if (!signal.aborted && isCurrentSelection(orderId, generation)) {
             updateLoading({ detail: false });
           }
         });
 
-      const eventsPromise = loadAvailableEventsForSelection(orderId, generation);
+      const eventsPromise = loadAvailableEventsForSelection(
+        orderId,
+        generation,
+        signal,
+      );
       const [detailResult] = await Promise.allSettled([
         detailPromise,
         eventsPromise,
       ]);
 
       if (detailResult.status === 'rejected') {
+        if (isCancelled(detailResult.reason, signal)) {
+          return null;
+        }
+
         throw detailResult.reason;
       }
 
@@ -159,6 +202,7 @@ export function useOrderWorkspace({
 
   const openOrder = useCallback(
     async (orderId: string) => {
+      const controller = startWorkspaceLoad();
       const nextGeneration = selectionGeneration.current + 1;
       selectionGeneration.current = nextGeneration;
       selectedOrderIdRef.current = orderId;
@@ -168,9 +212,10 @@ export function useOrderWorkspace({
         generation: nextGeneration,
         orderId,
         resetDetail: true,
+        signal: controller.signal,
       });
     },
-    [loadWorkspaceOrder],
+    [loadWorkspaceOrder, startWorkspaceLoad],
   );
 
   const selectCreatedOrderIfCurrent = useCallback(
@@ -180,6 +225,7 @@ export function useOrderWorkspace({
       }
 
       const nextGeneration = selectionGeneration.current + 1;
+      const controller = startWorkspaceLoad();
       selectionGeneration.current = nextGeneration;
       selectedOrderIdRef.current = order.orderId;
       setSelectedOrderId(order.orderId);
@@ -189,11 +235,13 @@ export function useOrderWorkspace({
       setAvailableEventsError(null);
       updateLoading({ detail: false, availableEvents: true });
 
-      void loadAvailableEventsForSelection(order.orderId, nextGeneration).catch(
-        () => undefined,
-      );
+      void loadAvailableEventsForSelection(
+        order.orderId,
+        nextGeneration,
+        controller.signal,
+      ).catch(() => undefined);
     },
-    [loadAvailableEventsForSelection, updateLoading],
+    [loadAvailableEventsForSelection, startWorkspaceLoad, updateLoading],
   );
 
   const retryAvailableEvents = useCallback(async () => {
@@ -205,13 +253,19 @@ export function useOrderWorkspace({
     }
 
     try {
-      await loadAvailableEventsForSelection(orderId, generation);
+      const controller = startWorkspaceLoad();
+      await loadAvailableEventsForSelection(
+        orderId,
+        generation,
+        controller.signal,
+      );
     } catch {
       return;
     }
-  }, [loadAvailableEventsForSelection]);
+  }, [loadAvailableEventsForSelection, startWorkspaceLoad]);
 
   const backToOrders = useCallback(() => {
+    abortWorkspaceLoad();
     selectionGeneration.current += 1;
     selectedOrderIdRef.current = null;
     setSelectedOrderId(null);
@@ -220,7 +274,7 @@ export function useOrderWorkspace({
     setDetailError(null);
     setAvailableEventsError(null);
     updateLoading({ detail: false, availableEvents: false, event: false });
-  }, [updateLoading]);
+  }, [abortWorkspaceLoad, updateLoading]);
 
   const refreshWorkspace = useCallback(async () => {
     const orderId = selectedOrderIdRef.current;
@@ -229,6 +283,7 @@ export function useOrderWorkspace({
       return;
     }
 
+    const controller = startWorkspaceLoad();
     const generation = selectionGeneration.current + 1;
     selectionGeneration.current = generation;
 
@@ -236,8 +291,9 @@ export function useOrderWorkspace({
       generation,
       orderId,
       resetDetail: false,
+      signal: controller.signal,
     });
-  }, [loadWorkspaceOrder]);
+  }, [loadWorkspaceOrder, startWorkspaceLoad]);
 
   const applyEventToSelectedOrder = useCallback(
     async (request: ApplyOrderEventRequest) => {
@@ -261,9 +317,11 @@ export function useOrderWorkspace({
         if (isCurrentSelection(targetOrderId, targetGeneration)) {
           setSelectedOrder(order);
           setDetailError(null);
+          const controller = startWorkspaceLoad();
           void loadAvailableEventsForSelection(
             targetOrderId,
             targetGeneration,
+            controller.signal,
           ).catch(() => undefined);
         }
       } catch (error) {
@@ -295,10 +353,13 @@ export function useOrderWorkspace({
       refreshSummaries,
       selectedOrder,
       showFeedback,
+      startWorkspaceLoad,
       updateLoading,
       upsertSummary,
     ],
   );
+
+  useEffect(() => abortWorkspaceLoad, [abortWorkspaceLoad]);
 
   return {
     applyEventToSelectedOrder,

@@ -12,17 +12,10 @@ import { upsertOrderSummary } from './orderSummary';
 type OverviewLoadingState = {
   summaries: boolean;
   create: boolean;
-  refresh: boolean;
   diagram: boolean;
 };
 
-type UseOrdersOverviewOptions = {
-  refreshWorkspace: () => Promise<void> | undefined;
-};
-
-export function useOrdersOverview({
-  refreshWorkspace,
-}: UseOrdersOverviewOptions) {
+export function useOrdersOverview() {
   const [health, setHealth] = useState<HealthState>('checking');
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [stateMachine, setStateMachine] =
@@ -33,7 +26,6 @@ export function useOrdersOverview({
   const [loading, setLoading] = useState<OverviewLoadingState>({
     summaries: true,
     create: false,
-    refresh: false,
     diagram: true,
   });
 
@@ -148,75 +140,32 @@ export function useOrdersOverview({
     [updateLoading, upsertSummary],
   );
 
-  const refreshDashboard = useCallback(async () => {
-    updateLoading({ refresh: true });
-
-    try {
-      await Promise.allSettled([
-        checkHealth(),
-        refreshSummaries(),
-        refreshStateMachine(),
-        refreshWorkspace(),
-      ]);
-    } finally {
-      updateLoading({ refresh: false });
-    }
-  }, [
-    checkHealth,
-    refreshStateMachine,
-    refreshSummaries,
-    refreshWorkspace,
-    updateLoading,
-  ]);
+  const refreshOverview = useCallback(async () => {
+    await Promise.allSettled([
+      checkHealth(),
+      refreshSummaries(),
+      refreshStateMachine(),
+    ]);
+  }, [checkHealth, refreshStateMachine, refreshSummaries]);
 
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
 
-    void getHealth(signal)
-      .then(() => {
-        setHealth('connected');
-      })
-      .catch((error: unknown) => {
-        if (!isApiCancelError(error)) {
-          setHealth('unavailable');
-        }
-      });
+    async function initializeOverview() {
+      await Promise.allSettled([
+        checkHealth(signal, false),
+        refreshSummaries(signal, false),
+        refreshStateMachine(signal, false),
+      ]);
+    }
 
-    void listOrders(signal)
-      .then((nextOrders) => {
-        setOrders(nextOrders);
-      })
-      .catch((error: unknown) => {
-        if (!isApiCancelError(error)) {
-          setListError(getApiErrorMessage(error));
-        }
-      })
-      .finally(() => {
-        if (!signal.aborted) {
-          updateLoading({ summaries: false });
-        }
-      });
-
-    void getStateMachineDefinition(signal)
-      .then((definition) => {
-        setStateMachine(definition);
-      })
-      .catch((error: unknown) => {
-        if (!isApiCancelError(error)) {
-          setDiagramError(getApiErrorMessage(error));
-        }
-      })
-      .finally(() => {
-        if (!signal.aborted) {
-          updateLoading({ diagram: false });
-        }
-      });
+    void initializeOverview();
 
     return () => {
       controller.abort();
     };
-  }, [updateLoading]);
+  }, [checkHealth, refreshStateMachine, refreshSummaries]);
 
   return {
     checkHealth,
@@ -228,7 +177,7 @@ export function useOrdersOverview({
     listError,
     loading,
     orders,
-    refreshDashboard,
+    refreshOverview,
     refreshStateMachine,
     refreshSummaries,
     showFeedback,

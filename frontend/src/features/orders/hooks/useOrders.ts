@@ -1,31 +1,45 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useState } from 'react';
 
 import type { CreateOrderRequest } from '../model/order.types';
 import { useOrderWorkspace } from './useOrderWorkspace';
 import { useOrdersOverview } from './useOrdersOverview';
 
 export function useOrders() {
-  const workspaceRefreshRef = useRef<(() => Promise<void>) | null>(null);
-  const overview = useOrdersOverview({
-    refreshWorkspace: () => workspaceRefreshRef.current?.(),
-  });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const overview = useOrdersOverview();
   const workspace = useOrderWorkspace({
     refreshSummaries: () => overview.refreshSummaries(),
     showFeedback: overview.showFeedback,
     upsertSummary: overview.upsertSummary,
   });
 
-  useEffect(() => {
-    workspaceRefreshRef.current = workspace.refreshWorkspace;
-  }, [workspace.refreshWorkspace]);
+  const createOverviewOrder = overview.createNewOrder;
+  const getSelectionGeneration = workspace.getSelectionGeneration;
+  const refreshOverview = overview.refreshOverview;
+  const refreshWorkspace = workspace.refreshWorkspace;
+  const selectCreatedOrderIfCurrent = workspace.selectCreatedOrderIfCurrent;
 
   const createNewOrder = useCallback(
     async (request: CreateOrderRequest) => {
-      const generationAtStart = workspace.getSelectionGeneration();
-      const order = await overview.createNewOrder(request);
-      workspace.selectCreatedOrderIfCurrent(order, generationAtStart);
+      const generationAtStart = getSelectionGeneration();
+      const order = await createOverviewOrder(request);
+      selectCreatedOrderIfCurrent(order, generationAtStart);
     },
-    [overview, workspace],
+    [createOverviewOrder, getSelectionGeneration, selectCreatedOrderIfCurrent],
+  );
+
+  const refreshDashboard = useCallback(async () => {
+    setIsRefreshing(true);
+
+    try {
+      await Promise.allSettled([
+        refreshOverview(),
+        refreshWorkspace(),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshOverview, refreshWorkspace],
   );
 
   return {
@@ -43,10 +57,11 @@ export function useOrders() {
     loading: {
       ...overview.loading,
       ...workspace.loading,
+      refresh: isRefreshing,
     },
     openOrder: workspace.openOrder,
     orders: overview.orders,
-    refreshDashboard: overview.refreshDashboard,
+    refreshDashboard,
     refreshSummaries: overview.refreshSummaries,
     retryAvailableEvents: workspace.retryAvailableEvents,
     selectedOrder: workspace.selectedOrder,
