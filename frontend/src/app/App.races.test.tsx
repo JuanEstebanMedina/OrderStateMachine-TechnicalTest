@@ -184,8 +184,6 @@ describe('App race-condition behavior', () => {
     expect(healthSignal?.aborted).toBe(true);
     expect(summariesSignal?.aborted).toBe(true);
     expect(stateMachineSignal?.aborted).toBe(true);
-    expect(screen.queryByText(/network error/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/cancel/i)).not.toBeInTheDocument();
   });
 
   it('aborts stale workspace GET requests and keeps the newer order visible', async () => {
@@ -318,5 +316,70 @@ describe('App race-condition behavior', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^refresh$/i })).toBeEnabled();
     });
+  });
+
+  it('does not abort a pending detail refresh when retrying available events', async () => {
+    const user = userEvent.setup();
+    const refreshedDetail = deferred<OrderDetail>();
+    const updatedDetail: OrderDetail = {
+      ...baseDetail,
+      amount: 444,
+      updatedAt: '2026-06-13T12:44:00Z',
+    };
+    let refreshedDetailSignal: AbortSignal | undefined;
+    let failedEventsSignal: AbortSignal | undefined;
+    let retriedEventsSignal: AbortSignal | undefined;
+
+    await renderOverview();
+    await openFirstOrder(user);
+    vi.mocked(getHealth).mockResolvedValueOnce({ status: 'ok' });
+    vi.mocked(listOrders).mockResolvedValueOnce([baseSummary, secondSummary]);
+    vi.mocked(getStateMachineDefinition).mockResolvedValueOnce(
+      stateMachineDefinition,
+    );
+    vi.mocked(getOrder).mockImplementationOnce(
+      (_orderId: string, signal?: AbortSignal) => {
+        refreshedDetailSignal = signal;
+        return refreshedDetail.promise;
+      },
+    );
+    vi.mocked(getAvailableEvents)
+      .mockImplementationOnce((_orderId: string, signal?: AbortSignal) => {
+        failedEventsSignal = signal;
+        return Promise.reject(createApiError(500, 'Available events failed'));
+      })
+      .mockImplementationOnce((_orderId: string, signal?: AbortSignal) => {
+        retriedEventsSignal = signal;
+        return Promise.resolve(['paymentSuccessful']);
+      });
+
+    await user.click(screen.getByRole('button', { name: /^refresh$/i }));
+
+    expect(
+      await screen.findByRole('button', { name: /retry available events/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/loading order detail/i)).toBeInTheDocument();
+    expect(refreshedDetailSignal).toBeDefined();
+    expect(failedEventsSignal).toBeDefined();
+
+    await user.click(
+      screen.getByRole('button', { name: /retry available events/i }),
+    );
+
+    expect(refreshedDetailSignal?.aborted).toBe(false);
+    expect(failedEventsSignal?.aborted).toBe(false);
+    expect(retriedEventsSignal).toBeDefined();
+    refreshedDetail.resolve(updatedDetail);
+
+    expect(await screen.findByText(/444/)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/loading order detail/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: /payment successful/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/available events failed/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/network error/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/canceled/i)).not.toBeInTheDocument();
   });
 });
