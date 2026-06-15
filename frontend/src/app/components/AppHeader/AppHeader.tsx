@@ -4,11 +4,11 @@ import styles from './AppHeader.module.css';
 import type { HealthState } from '../../../shared/types/health';
 import buttonStyles from '../../../shared/styles/buttons.module.css';
 
-type AppHeaderProps = {
+type AppHeaderProps = Readonly<{
   health: HealthState;
   isRefreshing: boolean;
   onRefresh: () => void;
-};
+}>;
 
 const HEALTH_LABELS: Record<HealthState, string> = {
   checking: 'Checking',
@@ -17,9 +17,11 @@ const HEALTH_LABELS: Record<HealthState, string> = {
 };
 
 export function AppHeader({ health, isRefreshing, onRefresh }: AppHeaderProps) {
-  const HealthIcon =
-    health === 'connected' ? Wifi : health === 'unavailable' ? WifiOff : LoaderCircle;
   const isHealthy = health === 'connected';
+  const healthStatusClassName = [
+    styles.healthStatus,
+    health === 'unavailable' ? styles.healthUnavailable : styles.healthSubtle,
+  ].join(' ');
 
   return (
     <header className={styles.appHeader}>
@@ -33,15 +35,15 @@ export function AppHeader({ health, isRefreshing, onRefresh }: AppHeaderProps) {
       </div>
       <div className={styles.headerActions}>
         <span
-          className={`${styles.healthStatus} ${
-            health === 'unavailable'
-              ? styles.healthUnavailable
-              : styles.healthSubtle
-          }`}
+          className={healthStatusClassName}
           aria-live="polite"
           aria-label={isHealthy ? HEALTH_LABELS[health] : undefined}
         >
-          <HealthIcon aria-hidden="true" size={18} />
+          {health === 'connected' ? <Wifi aria-hidden="true" size={18} /> : null}
+          {health === 'unavailable' ? <WifiOff aria-hidden="true" size={18} /> : null}
+          {health === 'checking' ? (
+            <LoaderCircle aria-hidden="true" size={18} />
+          ) : null}
           {isHealthy ? null : <span>{HEALTH_LABELS[health]}</span>}
         </span>
         <button

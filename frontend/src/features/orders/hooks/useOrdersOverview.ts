@@ -160,7 +160,7 @@ export function useOrdersOverview() {
       ]);
     }
 
-    void initializeOverview();
+    initializeOverview().catch(() => undefined);
 
     return () => {
       controller.abort();

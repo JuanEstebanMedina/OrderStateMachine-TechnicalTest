@@ -2,31 +2,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../features/orders/api/ordersApi', () => ({
-  applyOrderEvent: vi.fn(),
-  createOrder: vi.fn(),
-  getAvailableEvents: vi.fn(),
-  getHealth: vi.fn(),
-  getOrder: vi.fn(),
-  listOrders: vi.fn(),
-}));
-
-vi.mock('../features/orders/api/stateMachineApi', () => ({
-  getStateMachineDefinition: vi.fn(),
-}));
-
 import {
-  applyOrderEvent,
+  appApiMocks,
   deferred,
-  getAvailableEvents,
-  getHealth,
-  getOrder,
-  getStateMachineDefinition,
-  listOrders,
   openFirstOrder,
   openOrderName,
   renderOverview,
 } from '../test/appTestUtils';
+import { createApiError } from '../test/apiErrorFactory';
 import App from './App';
 import {
   baseDetail,
@@ -38,7 +21,15 @@ import {
 import type { OrderEventType } from '../features/orders/model/orderEvents';
 import type { OrderDetail } from '../features/orders/model/order.types';
 import type { StateMachineDefinition } from '../features/orders/model/stateMachine.types';
-import { createApiError } from '../test/appTestUtils';
+
+const {
+  applyOrderEvent,
+  getAvailableEvents,
+  getHealth,
+  getOrder,
+  getStateMachineDefinition,
+  listOrders,
+} = appApiMocks;
 
 describe('App race-condition behavior', () => {
   beforeEach(() => {
@@ -344,9 +335,9 @@ describe('App race-condition behavior', () => {
       },
     );
     vi.mocked(getAvailableEvents)
-      .mockImplementationOnce((_orderId: string, signal?: AbortSignal) => {
+      .mockImplementationOnce(async (_orderId: string, signal?: AbortSignal) => {
         failedEventsSignal = signal;
-        return Promise.reject(createApiError(500, 'Available events failed'));
+        throw createApiError(500, 'Available events failed');
       })
       .mockImplementationOnce((_orderId: string, signal?: AbortSignal) => {
         retriedEventsSignal = signal;

@@ -1,9 +1,20 @@
-import { AxiosError, type AxiosResponse } from 'axios';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 
-import App from '../app/App';
+vi.mock('../features/orders/api/ordersApi', () => ({
+  applyOrderEvent: vi.fn(),
+  createOrder: vi.fn(),
+  getAvailableEvents: vi.fn(),
+  getHealth: vi.fn(),
+  getOrder: vi.fn(),
+  listOrders: vi.fn(),
+}));
+
+vi.mock('../features/orders/api/stateMachineApi', () => ({
+  getStateMachineDefinition: vi.fn(),
+}));
+
 import {
   applyOrderEvent,
   createOrder,
@@ -13,6 +24,7 @@ import {
   listOrders,
 } from '../features/orders/api/ordersApi';
 import { getStateMachineDefinition } from '../features/orders/api/stateMachineApi';
+import App from '../app/App';
 import {
   baseDetail,
   baseSummary,
@@ -21,21 +33,15 @@ import {
   stateMachineDefinition,
 } from '../features/orders/test/factories';
 
-export function createApiError(status: number, detail: string) {
-  return new AxiosError(
-    detail,
-    'ERR_BAD_RESPONSE',
-    undefined,
-    undefined,
-    {
-      status,
-      statusText: String(status),
-      data: { detail },
-      headers: {},
-      config: {},
-    } as AxiosResponse,
-  );
-}
+export const appApiMocks = {
+  applyOrderEvent,
+  createOrder,
+  getAvailableEvents,
+  getHealth,
+  getOrder,
+  getStateMachineDefinition,
+  listOrders,
+};
 
 export function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -49,21 +55,25 @@ export function deferred<T>() {
 }
 
 export function setupApiDefaults() {
-  vi.mocked(getHealth).mockResolvedValue({ status: 'ok' });
-  vi.mocked(listOrders).mockResolvedValue([baseSummary, secondSummary]);
-  vi.mocked(getStateMachineDefinition).mockResolvedValue(stateMachineDefinition);
-  vi.mocked(getOrder).mockImplementation(async (orderId: string) => {
+  vi.mocked(appApiMocks.getHealth).mockResolvedValue({ status: 'ok' });
+  vi.mocked(appApiMocks.listOrders).mockResolvedValue([baseSummary, secondSummary]);
+  vi.mocked(appApiMocks.getStateMachineDefinition).mockResolvedValue(
+    stateMachineDefinition,
+  );
+  vi.mocked(appApiMocks.getOrder).mockImplementation(async (orderId: string) => {
     if (orderId === secondSummary.orderId) {
       return secondDetail;
     }
 
     return baseDetail;
   });
-  vi.mocked(getAvailableEvents).mockResolvedValue(['paymentSuccessful']);
+  vi.mocked(appApiMocks.getAvailableEvents).mockResolvedValue([
+    'paymentSuccessful',
+  ]);
 }
 
 export function openOrderName(orderId: string) {
-  return new RegExp(`open order\\s+${orderId}`, 'i');
+  return new RegExp(String.raw`open order\s+${orderId}`, 'i');
 }
 
 export async function renderOverview() {
@@ -81,13 +91,3 @@ export async function openFirstOrder(user = userEvent.setup()) {
   await screen.findByRole('button', { name: /back to orders/i });
   return user;
 }
-
-export {
-  applyOrderEvent,
-  createOrder,
-  getAvailableEvents,
-  getHealth,
-  getOrder,
-  getStateMachineDefinition,
-  listOrders,
-};

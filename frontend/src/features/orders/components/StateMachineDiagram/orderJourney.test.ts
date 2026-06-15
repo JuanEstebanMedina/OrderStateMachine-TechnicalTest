@@ -42,7 +42,7 @@ describe('orderJourney helpers', () => {
     ]);
 
     expect(model.terminalStates.has('Cancelled')).toBe(true);
-    expect(describeTransition(model.historicalEdges[0]!)).toMatch(
+    expect(describeTransition(model.historicalEdges[0])).toMatch(
       /historical: pending to pending payment/i,
     );
   });

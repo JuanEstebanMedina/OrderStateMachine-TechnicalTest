@@ -36,6 +36,10 @@ function isCancelled(error: unknown, signal?: AbortSignal) {
   return signal?.aborted || isApiCancelError(error);
 }
 
+function ignoreRejectedPromise(promise: Promise<unknown>) {
+  promise.catch(() => undefined);
+}
+
 export function useOrderWorkspace({
   refreshSummaries,
   showFeedback,
@@ -164,7 +168,7 @@ export function useOrderWorkspace({
         })
         .catch(async (error: unknown) => {
           if (isCancelled(error, signal)) {
-            return Promise.reject(error);
+            throw error;
           }
 
           if (isCurrentSelection(orderId, generation)) {
@@ -176,12 +180,12 @@ export function useOrderWorkspace({
               try {
                 await refreshSummaries();
               } catch {
-                return Promise.reject(error);
+                throw error;
               }
             }
           }
 
-          return Promise.reject(error);
+          throw error;
         })
         .finally(() => {
           if (!signal.aborted && isCurrentSelection(orderId, generation)) {
@@ -255,11 +259,13 @@ export function useOrderWorkspace({
       setAvailableEventsError(null);
       updateLoading({ detail: false, availableEvents: true });
 
-      void loadAvailableEventsForSelection(
-        order.orderId,
-        nextGeneration,
-        controller.signal,
-      ).catch(() => undefined);
+      ignoreRejectedPromise(
+        loadAvailableEventsForSelection(
+          order.orderId,
+          nextGeneration,
+          controller.signal,
+        ),
+      );
     },
     [
       abortAllWorkspaceRequests,
@@ -343,11 +349,13 @@ export function useOrderWorkspace({
           setSelectedOrder(order);
           setDetailError(null);
           const controller = startAvailableEventsLoad();
-          void loadAvailableEventsForSelection(
-            targetOrderId,
-            targetGeneration,
-            controller.signal,
-          ).catch(() => undefined);
+          ignoreRejectedPromise(
+            loadAvailableEventsForSelection(
+              targetOrderId,
+              targetGeneration,
+              controller.signal,
+            ),
+          );
         }
       } catch (error) {
         if (isCurrentSelection(targetOrderId, targetGeneration)) {

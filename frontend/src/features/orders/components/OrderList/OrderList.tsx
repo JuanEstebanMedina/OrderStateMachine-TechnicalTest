@@ -18,7 +18,7 @@ import buttonStyles from '../../../../shared/styles/buttons.module.css';
 import formStyles from '../../../../shared/styles/forms.module.css';
 import layoutStyles from '../../../../shared/styles/layout.module.css';
 
-type OrderListProps = {
+type OrderListProps = Readonly<{
   error: string | null;
   isLoading: boolean;
   orders: OrderSummary[];
@@ -26,7 +26,7 @@ type OrderListProps = {
   selectedOrderId: string | null;
   onRetry: () => void;
   onSelect: (orderId: string) => void;
-};
+}>;
 
 export function OrderList({
   error,

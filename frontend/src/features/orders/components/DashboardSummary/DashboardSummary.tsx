@@ -4,9 +4,9 @@ import styles from './DashboardSummary.module.css';
 import { DASHBOARD_STATE_GROUPS } from '../../model/orderStates';
 import type { OrderSummary } from '../../model/order.types';
 
-type DashboardSummaryProps = {
+type DashboardSummaryProps = Readonly<{
   orders: OrderSummary[];
-};
+}>;
 
 function countGroup(orders: OrderSummary[], states: readonly string[]): number {
   return orders.filter((order) => states.includes(order.currentState)).length;

@@ -1,26 +1,10 @@
-import { AxiosError, type AxiosResponse } from 'axios';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { EventForm } from './EventForm';
 import { stateMachineDefinition } from '../../test/factories';
-
-function createConflictError() {
-  return new AxiosError(
-    'Conflict',
-    'ERR_BAD_RESPONSE',
-    undefined,
-    undefined,
-    {
-      status: 409,
-      statusText: 'Conflict',
-      data: { detail: 'Invalid order transition' },
-      headers: {},
-      config: {},
-    } as AxiosResponse,
-  );
-}
+import { createApiError } from '../../../../test/apiErrorFactory';
 
 describe('EventForm', () => {
   const defaultProps = {
@@ -139,7 +123,9 @@ describe('EventForm', () => {
 
   it('displays a conflict error', async () => {
     const user = userEvent.setup();
-    const onApply = vi.fn().mockRejectedValue(createConflictError());
+    const onApply = vi.fn().mockRejectedValue(
+      createApiError(409, 'Invalid order transition'),
+    );
 
     render(
       <EventForm

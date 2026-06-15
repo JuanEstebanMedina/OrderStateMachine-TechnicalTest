@@ -12,13 +12,13 @@ import { LoadingState } from '../../../../shared/ui/LoadingState/LoadingState';
 import formStyles from '../../../../shared/styles/forms.module.css';
 import layoutStyles from '../../../../shared/styles/layout.module.css';
 
-type StateMachineDiagramProps = {
+type StateMachineDiagramProps = Readonly<{
   availableEvents: OrderEventType[];
   definition: StateMachineDefinition | null;
   error: string | null;
   isLoading: boolean;
   order: OrderDetail | null;
-};
+}>;
 
 export function StateMachineDiagram({
   availableEvents,

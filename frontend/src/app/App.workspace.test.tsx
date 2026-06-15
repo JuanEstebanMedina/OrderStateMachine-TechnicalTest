@@ -2,29 +2,16 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../features/orders/api/ordersApi', () => ({
-  applyOrderEvent: vi.fn(),
-  createOrder: vi.fn(),
-  getAvailableEvents: vi.fn(),
-  getHealth: vi.fn(),
-  getOrder: vi.fn(),
-  listOrders: vi.fn(),
-}));
-
-vi.mock('../features/orders/api/stateMachineApi', () => ({
-  getStateMachineDefinition: vi.fn(),
-}));
-
 import {
-  applyOrderEvent,
-  createApiError,
-  createOrder,
-  getAvailableEvents,
+  appApiMocks,
   openFirstOrder,
   renderOverview,
 } from '../test/appTestUtils';
+import { createApiError } from '../test/apiErrorFactory';
 import { baseDetail } from '../features/orders/test/factories';
 import type { OrderDetail } from '../features/orders/model/order.types';
+
+const { applyOrderEvent, createOrder, getAvailableEvents } = appApiMocks;
 
 describe('App workspace partial failures', () => {
   beforeEach(() => {

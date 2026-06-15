@@ -2,9 +2,9 @@ import styles from './StateMachineDiagram.module.css';
 import type { StateMachineDefinition } from '../../model/stateMachine.types';
 import { formatOrderEvent, formatOrderState } from '../../utils/orderFormatters';
 
-type TransitionInventoryProps = {
+type TransitionInventoryProps = Readonly<{
   definition: StateMachineDefinition;
-};
+}>;
 
 export function TransitionInventory({ definition }: TransitionInventoryProps) {
   return (
