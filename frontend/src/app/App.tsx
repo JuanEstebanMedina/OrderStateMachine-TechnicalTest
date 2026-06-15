@@ -11,6 +11,8 @@ import { OrderList } from '../features/orders/components/OrderList/OrderList';
 import { StateMachineDiagram } from '../features/orders/components/StateMachineDiagram/StateMachineDiagram';
 import { useOrders } from '../features/orders/hooks/useOrders';
 import { FeedbackAlert } from '../shared/ui/FeedbackAlert/FeedbackAlert';
+import buttonStyles from '../shared/styles/buttons.module.css';
+import layoutStyles from '../shared/styles/layout.module.css';
 
 const App = () => {
   const {
@@ -38,19 +40,19 @@ const App = () => {
   const isWorkspaceMode = selectedOrderId !== null;
 
   return (
-    <div className={`${styles.moduleScope} app-shell`}>
+    <div className={styles.appShell}>
       <AppHeader
         health={health}
         isRefreshing={loading.refresh}
         onRefresh={() => void refreshDashboard()}
       />
-      <main className="dashboard-main">
+      <main className={styles.dashboardMain}>
         <FeedbackAlert feedback={feedback} onDismiss={clearFeedback} />
 
         {!isWorkspaceMode ? (
-          <div className="overview-layout">
+          <div className={styles.overviewLayout}>
             <DashboardSummary orders={orders} />
-            <div className="action-grid">
+            <div className={styles.actionGrid}>
               <CreateOrderForm
                 isSubmitting={loading.create}
                 onCreate={createNewOrder}
@@ -64,16 +66,17 @@ const App = () => {
               error={listError}
               isLoading={loading.summaries}
               orders={orders}
+              states={stateMachine?.states ?? []}
               selectedOrderId={selectedOrderId}
               onRetry={() => void refreshSummaries()}
               onSelect={(orderId) => void openOrder(orderId)}
             />
           </div>
         ) : (
-          <div className="workspace-layout">
+          <div className={styles.workspaceLayout}>
             <button
               type="button"
-              className="button secondary back-button"
+              className={`${buttonStyles.button} ${buttonStyles.secondary} ${styles.backButton}`}
               onClick={backToOrders}
             >
               Back to orders
@@ -95,8 +98,13 @@ const App = () => {
                   onApply={applyEventToSelectedOrder}
                   onRetry={() => void retryAvailableEvents()}
                 />
-                <section className="panel history-panel" aria-labelledby="history-title">
-                  <h2 id="history-title">History</h2>
+                <section
+                  className={`${layoutStyles.panel} ${styles.historyPanel}`}
+                  aria-labelledby="history-title"
+                >
+                  <h2 className={layoutStyles.panelTitle} id="history-title">
+                    History
+                  </h2>
                   <HistoryTimeline history={selectedOrder.history} />
                 </section>
               </>

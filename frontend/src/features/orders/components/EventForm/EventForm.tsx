@@ -6,6 +6,9 @@ import type { OrderEventType } from '../../model/orderEvents';
 import { formatOrderEvent } from '../../utils/orderFormatters';
 import type { ApplyOrderEventRequest, OrderMetadata } from '../../model/order.types';
 import { getApiErrorMessage } from '../../../../shared/api/apiError';
+import buttonStyles from '../../../../shared/styles/buttons.module.css';
+import formStyles from '../../../../shared/styles/forms.module.css';
+import layoutStyles from '../../../../shared/styles/layout.module.css';
 
 type EventFormProps = {
   availableEvents: OrderEventType[];
@@ -67,34 +70,42 @@ export function EventForm({
   if (isDisabled) {
     return (
       <section
-        className={`${styles.moduleScope} panel event-panel`}
+        className={`${layoutStyles.panel} ${styles.eventPanel}`}
         aria-labelledby="event-form-title"
       >
-        <h2 id="event-form-title">Apply available event</h2>
-        <p className="muted">Select an order before applying events.</p>
+        <h2 className={layoutStyles.panelTitle} id="event-form-title">
+          Apply available event
+        </h2>
+        <p className={formStyles.muted}>Select an order before applying events.</p>
       </section>
     );
   }
 
   return (
     <section
-      className={`${styles.moduleScope} panel event-panel`}
+      className={`${layoutStyles.panel} ${styles.eventPanel}`}
       aria-labelledby="event-form-title"
     >
-      <div className="panel-heading">
-        <h2 id="event-form-title">Apply available event</h2>
+      <div className={layoutStyles.panelHeading}>
+        <h2 className={layoutStyles.panelTitle} id="event-form-title">
+          Apply available event
+        </h2>
       </div>
 
       {isLoading ? (
-        <p className="muted" role="status">
+        <p className={formStyles.muted} role="status">
           Loading available events.
         </p>
       ) : null}
 
       {loadError ? (
-        <div className="inline-error" role="alert">
+        <div className={formStyles.inlineError} role="alert">
           <p>{loadError}</p>
-          <button type="button" className="button secondary" onClick={onRetry}>
+          <button
+            type="button"
+            className={`${buttonStyles.button} ${buttonStyles.secondary}`}
+            onClick={onRetry}
+          >
             <RefreshCw aria-hidden="true" size={18} />
             Retry available events
           </button>
@@ -102,17 +113,20 @@ export function EventForm({
       ) : null}
 
       {!isLoading && !loadError && availableEvents.length === 0 ? (
-        <p className="muted">
+        <p className={formStyles.muted}>
           No further transitions are available for this order.
         </p>
       ) : null}
 
       {!isLoading && !loadError && availableEvents.length > 0 ? (
-        <form className="stacked-form" onSubmit={handleSubmit} noValidate>
-          <div className="form-field">
-            <label htmlFor="eventType">Event</label>
+        <form className={formStyles.form} onSubmit={handleSubmit} noValidate>
+          <div className={formStyles.field}>
+            <label className={formStyles.label} htmlFor="eventType">
+              Event
+            </label>
             <select
               id="eventType"
+              className={formStyles.control}
               value={selectedEventValue}
               onChange={(event) =>
                 setSelectedEvent(event.target.value as OrderEventType)
@@ -126,10 +140,13 @@ export function EventForm({
               ))}
             </select>
           </div>
-          <div className="form-field">
-            <label htmlFor="metadata">Metadata JSON</label>
+          <div className={formStyles.field}>
+            <label className={formStyles.label} htmlFor="metadata">
+              Metadata JSON
+            </label>
             <textarea
               id="metadata"
+              className={`${formStyles.control} ${formStyles.textarea}`}
               value={metadataValue}
               onChange={(event) => setMetadataValue(event.target.value)}
               rows={5}
@@ -137,11 +154,15 @@ export function EventForm({
             />
           </div>
           {error ? (
-            <p className="field-error" role="alert">
+            <p className={formStyles.fieldError} role="alert">
               {error}
             </p>
           ) : null}
-          <button type="submit" className="button primary" disabled={isSubmitting}>
+          <button
+            type="submit"
+            className={`${buttonStyles.button} ${buttonStyles.primary}`}
+            disabled={isSubmitting}
+          >
             <Send aria-hidden="true" size={18} />
             {isSubmitting ? 'Applying' : 'Apply event'}
           </button>

@@ -7,7 +7,7 @@ type EmptyStateProps = {
 
 export function EmptyState({ title, message }: EmptyStateProps) {
   return (
-    <div className={`${styles.moduleScope} empty-state`}>
+    <div className={styles.emptyState}>
       <h3>{title}</h3>
       <p>{message}</p>
     </div>

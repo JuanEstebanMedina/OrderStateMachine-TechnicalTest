@@ -1,64 +1,46 @@
-.moduleScope {
-}
-
-:global(.app-shell) {
+.appShell {
   min-height: 100vh;
   background:
     linear-gradient(180deg, rgba(20, 184, 166, 0.08), transparent 260px),
     var(--color-bg);
 }
 
-:global(.dashboard-main) {
+.dashboardMain {
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
   padding: 0 0 48px;
 }
 
-:global(.overview-layout),
-:global(.workspace-layout) {
+.overviewLayout,
+.workspaceLayout {
   display: grid;
   gap: var(--space-4);
 }
 
-:global(.action-grid) {
+.actionGrid {
   display: grid;
+  align-items: stretch;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
-  align-items: start;
 }
 
-:global(.back-button) {
+.backButton {
   width: fit-content;
 }
 
-:global(.history-panel) {
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-soft);
-  padding: 18px;
-}
-
-:global(.history-panel h2) {
-  margin: 0 0 var(--space-4);
-  color: var(--color-text-strong);
-  font-size: 1.05rem;
-  line-height: 1.3;
-  letter-spacing: 0;
+.historyPanel {
+  display: grid;
+  gap: var(--space-4);
 }
 
 @media (max-width: 980px) {
-  :global(.action-grid) {
+  .actionGrid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
-  :global(.dashboard-main) {
+  .dashboardMain {
     width: min(100% - 24px, 1180px);
-  }
-
-  :global(.history-panel) {
-    padding: 14px;
   }
 }

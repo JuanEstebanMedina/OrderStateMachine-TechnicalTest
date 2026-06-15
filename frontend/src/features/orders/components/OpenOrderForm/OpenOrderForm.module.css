@@ -1,28 +1,23 @@
-.moduleScope {
+.openOrderPanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-:global(.open-order-panel) {
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-soft);
-  padding: 18px;
+.description {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
 }
 
-:global(.open-order-panel h2) {
-  margin: 0;
-  color: var(--color-text-strong);
-  font-size: 1.05rem;
-  line-height: 1.3;
-  letter-spacing: 0;
-}
-
-:global(.open-order-panel .stacked-form) {
+.form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
   margin-top: var(--space-4);
 }
 
-@media (max-width: 640px) {
-  :global(.open-order-panel) {
-    padding: 14px;
-  }
+.submitButton {
+  margin-top: auto;
 }

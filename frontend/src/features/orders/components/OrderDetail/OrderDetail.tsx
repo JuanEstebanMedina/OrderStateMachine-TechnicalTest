@@ -8,6 +8,9 @@ import { formatCurrency } from '../../utils/orderFormatters';
 import { EmptyState } from '../../../../shared/ui/EmptyState/EmptyState';
 import { LoadingState } from '../../../../shared/ui/LoadingState/LoadingState';
 import { StateBadge } from '../StateBadge/StateBadge';
+import buttonStyles from '../../../../shared/styles/buttons.module.css';
+import formStyles from '../../../../shared/styles/forms.module.css';
+import layoutStyles from '../../../../shared/styles/layout.module.css';
 
 type OrderDetailProps = {
   error: string | null;
@@ -21,7 +24,7 @@ export function OrderDetail({ error, isLoading, order }: OrderDetailProps) {
   if (isLoading) {
     return (
       <section
-        className={`${styles.moduleScope} panel detail-panel`}
+        className={`${layoutStyles.panel} ${styles.detailPanel}`}
         aria-labelledby="order-detail-title"
       >
         <LoadingState label="Loading order detail" />
@@ -32,12 +35,14 @@ export function OrderDetail({ error, isLoading, order }: OrderDetailProps) {
   if (!order) {
     return (
       <section
-        className={`${styles.moduleScope} panel detail-panel`}
+        className={`${layoutStyles.panel} ${styles.detailPanel}`}
         aria-labelledby="order-detail-title"
       >
-        <h2 id="order-detail-title">Order workspace</h2>
+        <h2 className={layoutStyles.panelTitle} id="order-detail-title">
+          Order workspace
+        </h2>
         {error ? (
-          <div className="inline-error" role="alert">
+          <div className={formStyles.inlineError} role="alert">
             {error}
           </div>
         ) : (
@@ -62,28 +67,30 @@ export function OrderDetail({ error, isLoading, order }: OrderDetailProps) {
 
   return (
     <section
-      className={`${styles.moduleScope} panel detail-panel`}
+      className={`${layoutStyles.panel} ${styles.detailPanel}`}
       aria-labelledby="order-detail-title"
     >
-      <div className="panel-heading">
-        <h2 id="order-detail-title">Order identity</h2>
+      <div className={layoutStyles.panelHeading}>
+        <h2 className={layoutStyles.panelTitle} id="order-detail-title">
+          Order identity
+        </h2>
         <StateBadge state={order.currentState} />
       </div>
 
       {error ? (
-        <div className="inline-error" role="alert">
+        <div className={formStyles.inlineError} role="alert">
           {error}
         </div>
       ) : null}
 
-      <dl className="detail-grid">
+      <dl className={styles.detailGrid}>
         <div>
           <dt>Order ID</dt>
-          <dd className="copy-row">
-            <code>{order.orderId}</code>
+          <dd className={styles.copyRow}>
+            <code className={styles.code}>{order.orderId}</code>
             <button
               type="button"
-              className="icon-button"
+              className={buttonStyles.iconButton}
               onClick={copyOrderId}
               aria-label="Copy order ID"
             >
@@ -113,7 +120,7 @@ export function OrderDetail({ error, isLoading, order }: OrderDetailProps) {
         </div>
       </dl>
 
-      <div className="product-list" aria-label="Product IDs">
+      <div className={styles.productList} aria-label="Product IDs">
         {order.productIds.map((productId) => (
           <span key={productId}>{productId}</span>
         ))}

@@ -30,10 +30,18 @@ available events, history, and a contextual state-machine diagram. The diagram
 shows visited and currently available edges by default, with the complete
 backend transition inventory in a disclosure.
 
-Create-order input trims product IDs, removes duplicates, and requires a
-positive finite amount before submitting to the API. Runtime `.env` files and
-build output are intentionally ignored; keep using `.env.example` as the shared
-template.
+Backend metadata drives runtime states, available events, transition
+definitions, the initial state, current state, and history. TypeScript models
+describe HTTP contracts; they do not define business transitions. The frontend
+only keeps labels, formatting, colors, and layout as presentation concerns.
+
+Product IDs can be pasted with commas or line breaks. The field trims values,
+removes empties, deduplicates in order, and submits `productIds: string[]`; the
+backend remains authoritative for validation. Desktop SVG and mobile journey
+views use the same backend-derived journey model.
+
+Runtime `.env` files and build output are intentionally ignored; keep using
+`.env.example` as the shared template.
 
 ## Validation
 

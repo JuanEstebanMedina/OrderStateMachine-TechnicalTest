@@ -8,7 +8,7 @@ type StateBadgeProps = {
 
 export function StateBadge({ state }: StateBadgeProps) {
   return (
-    <span className={`${styles.moduleScope} state-badge`} data-state={state}>
+    <span className={styles.stateBadge} data-state={state}>
       {formatOrderState(state)}
     </span>
   );

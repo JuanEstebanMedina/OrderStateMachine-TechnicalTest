@@ -4,6 +4,11 @@ import { Plus } from 'lucide-react';
 import styles from './CreateOrderForm.module.css';
 import type { CreateOrderRequest } from '../../model/order.types';
 import { getApiErrorMessage } from '../../../../shared/api/apiError';
+import { ProductIdsField } from '../ProductIdsField/ProductIdsField';
+import { parseProductIds } from '../ProductIdsField/productIdsParser';
+import buttonStyles from '../../../../shared/styles/buttons.module.css';
+import formStyles from '../../../../shared/styles/forms.module.css';
+import layoutStyles from '../../../../shared/styles/layout.module.css';
 
 type CreateOrderFormProps = {
   isSubmitting: boolean;
@@ -15,17 +20,6 @@ type FormErrors = {
   amount?: string;
   submit?: string;
 };
-
-function parseProductIds(value: string): string[] {
-  return Array.from(
-    new Set(
-      value
-        .split(',')
-        .map((productId) => productId.trim())
-        .filter(Boolean),
-    ),
-  );
-}
 
 export function CreateOrderForm({
   isSubmitting,
@@ -68,32 +62,27 @@ export function CreateOrderForm({
 
   return (
     <section
-      className={`${styles.moduleScope} panel create-panel`}
+      className={`${layoutStyles.panel} ${styles.createPanel}`}
       aria-labelledby="create-order-title"
     >
-      <div className="panel-heading">
-        <h2 id="create-order-title">Create order</h2>
+      <div className={layoutStyles.panelHeading}>
+        <h2 className={layoutStyles.panelTitle} id="create-order-title">
+          Create order
+        </h2>
       </div>
-      <form className="stacked-form" onSubmit={handleSubmit} noValidate>
-        <div className="form-field">
-          <label htmlFor="productIds">Product IDs</label>
-          <input
-            id="productIds"
-            value={productIdsValue}
-            onChange={(event) => setProductIdsValue(event.target.value)}
-            placeholder="product-1, product-2"
-            aria-describedby={errors.productIds ? 'productIds-error' : undefined}
-          />
-          {errors.productIds ? (
-            <p className="field-error" id="productIds-error">
-              {errors.productIds}
-            </p>
-          ) : null}
-        </div>
-        <div className="form-field">
-          <label htmlFor="amount">Amount in USD</label>
+      <form className={styles.form} onSubmit={handleSubmit} noValidate>
+        <ProductIdsField
+          value={productIdsValue}
+          onChange={setProductIdsValue}
+          error={errors.productIds}
+        />
+        <div className={formStyles.field}>
+          <label className={formStyles.label} htmlFor="amount">
+            Amount in USD
+          </label>
           <input
             id="amount"
+            className={formStyles.control}
             type="number"
             min="0"
             step="0.01"
@@ -102,13 +91,19 @@ export function CreateOrderForm({
             aria-describedby={errors.amount ? 'amount-error' : undefined}
           />
           {errors.amount ? (
-            <p className="field-error" id="amount-error">
+            <p className={formStyles.fieldError} id="amount-error">
               {errors.amount}
             </p>
           ) : null}
         </div>
-        {errors.submit ? <p className="field-error">{errors.submit}</p> : null}
-        <button type="submit" className="button primary" disabled={isSubmitting}>
+        {errors.submit ? (
+          <p className={formStyles.fieldError}>{errors.submit}</p>
+        ) : null}
+        <button
+          type="submit"
+          className={`${buttonStyles.button} ${buttonStyles.primary} ${styles.submitButton}`}
+          disabled={isSubmitting}
+        >
           <Plus aria-hidden="true" size={18} />
           {isSubmitting ? 'Creating' : 'Create order'}
         </button>

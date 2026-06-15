@@ -15,7 +15,7 @@ function historyKey(entry: OrderHistoryEntry, index: number): string {
 export function HistoryTimeline({ history }: HistoryTimelineProps) {
   if (history.length === 0) {
     return (
-      <div className={`${styles.moduleScope} empty-history`}>
+      <div className={styles.emptyHistory}>
         No events have been applied yet.
       </div>
     );
@@ -23,25 +23,27 @@ export function HistoryTimeline({ history }: HistoryTimelineProps) {
 
   return (
     <ol
-      className={`${styles.moduleScope} history-timeline`}
+      className={styles.historyTimeline}
       aria-label="Order transition history"
     >
       {history.map((entry, index) => (
-        <li key={historyKey(entry, index)} className="history-item">
-          <div className="history-marker" aria-hidden="true" />
-          <div className="history-card">
-            <div className="history-title">
+        <li key={historyKey(entry, index)} className={styles.historyItem}>
+          <div className={styles.historyMarker} aria-hidden="true" />
+          <div className={styles.historyCard}>
+            <div className={styles.historyTitle}>
               <strong>{formatOrderEvent(entry.eventType)}</strong>
               <time dateTime={entry.createdAt}>
                 {formatDateTime(entry.createdAt)}
               </time>
             </div>
-            <div className="state-flow">
+            <div className={styles.stateFlow}>
               <StateBadge state={entry.fromState} />
               <span aria-hidden="true">&rarr;</span>
               <StateBadge state={entry.toState} />
             </div>
-            <pre className="metadata-block">{formatMetadata(entry.metadata)}</pre>
+            <pre className={styles.metadataBlock}>
+              {formatMetadata(entry.metadata)}
+            </pre>
           </div>
         </li>
       ))}

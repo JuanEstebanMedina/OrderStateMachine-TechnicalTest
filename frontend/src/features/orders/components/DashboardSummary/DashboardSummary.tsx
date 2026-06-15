@@ -42,12 +42,9 @@ export function DashboardSummary({ orders }: DashboardSummaryProps) {
   ];
 
   return (
-    <section
-      className={`${styles.moduleScope} summary-grid`}
-      aria-label="Dashboard summary"
-    >
+    <section className={styles.summaryGrid} aria-label="Dashboard summary">
       {summaries.map(({ label, value, icon: Icon }) => (
-        <article className="summary-card" key={label}>
+        <article className={styles.summaryCard} key={label}>
           <Icon aria-hidden="true" size={22} />
           <div>
             <p>{label}</p>

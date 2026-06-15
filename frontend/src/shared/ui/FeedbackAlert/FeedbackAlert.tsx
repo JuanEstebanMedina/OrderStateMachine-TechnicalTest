@@ -1,7 +1,8 @@
 import { X } from 'lucide-react';
 
 import styles from './FeedbackAlert.module.css';
-import type { FeedbackMessage } from '../../../features/orders/hooks/useOrders';
+import type { FeedbackMessage } from '../../types/feedback';
+import buttonStyles from '../../styles/buttons.module.css';
 
 type FeedbackAlertProps = {
   feedback: FeedbackMessage | null;
@@ -15,14 +16,16 @@ export function FeedbackAlert({ feedback, onDismiss }: FeedbackAlertProps) {
 
   return (
     <div
-      className={`${styles.moduleScope} feedback feedback-${feedback.type}`}
+      className={`${styles.feedback} ${
+        feedback.type === 'success' ? styles.feedbackSuccess : styles.feedbackError
+      }`}
       role={feedback.type === 'error' ? 'alert' : 'status'}
       aria-live="polite"
     >
       <span>{feedback.message}</span>
       <button
         type="button"
-        className="icon-button"
+        className={buttonStyles.iconButton}
         onClick={onDismiss}
         aria-label="Dismiss message"
       >

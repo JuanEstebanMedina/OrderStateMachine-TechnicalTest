@@ -17,9 +17,10 @@ export const ORDER_EVENT_TYPES = [
   'refundProcessed',
 ] as const;
 
-export type OrderEventType = (typeof ORDER_EVENT_TYPES)[number];
+export type KnownOrderEventType = (typeof ORDER_EVENT_TYPES)[number];
+export type OrderEventType = KnownOrderEventType | (string & {});
 
-export const ORDER_EVENT_LABELS: Record<OrderEventType, string> = {
+export const ORDER_EVENT_LABELS: Record<KnownOrderEventType, string> = {
   init: 'Created',
   pendingBiometricalVerification: 'Pending biometrical verification',
   noVerificationNeeded: 'No verification needed',
@@ -37,3 +38,9 @@ export const ORDER_EVENT_LABELS: Record<OrderEventType, string> = {
   itemReceivedBack: 'Item received back',
   refundProcessed: 'Refund processed',
 };
+
+export function isKnownOrderEventType(
+  eventType: OrderEventType,
+): eventType is KnownOrderEventType {
+  return ORDER_EVENT_TYPES.includes(eventType as KnownOrderEventType);
+}

@@ -3,6 +3,9 @@ import { Search } from 'lucide-react';
 
 import styles from './OpenOrderForm.module.css';
 import { getApiErrorMessage } from '../../../../shared/api/apiError';
+import buttonStyles from '../../../../shared/styles/buttons.module.css';
+import formStyles from '../../../../shared/styles/forms.module.css';
+import layoutStyles from '../../../../shared/styles/layout.module.css';
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -35,27 +38,45 @@ export function OpenOrderForm({ isLoading, onOpen }: OpenOrderFormProps) {
 
   return (
     <section
-      className={`${styles.moduleScope} open-order-panel`}
+      className={`${layoutStyles.panel} ${styles.openOrderPanel}`}
       aria-labelledby="open-order-title"
     >
-      <h2 id="open-order-title">Open order by ID</h2>
-      <form className="stacked-form" onSubmit={handleSubmit} noValidate>
-        <div className="form-field">
-          <label htmlFor="openOrderId">Order UUID</label>
+      <div>
+        <h2 className={layoutStyles.panelTitle} id="open-order-title">
+          Open order by ID
+        </h2>
+        <p className={styles.description}>
+          Paste the complete UUID returned when the order was created.
+        </p>
+      </div>
+      <form className={styles.form} onSubmit={handleSubmit} noValidate>
+        <div className={formStyles.field}>
+          <label className={formStyles.label} htmlFor="openOrderId">
+            Order UUID
+          </label>
           <input
             id="openOrderId"
+            className={formStyles.control}
             value={orderId}
             onChange={(event) => setOrderId(event.target.value)}
             placeholder="11111111-1111-1111-1111-111111111111"
             aria-describedby={error ? 'openOrderId-error' : undefined}
           />
           {error ? (
-            <p className="field-error" id="openOrderId-error" role="alert">
+            <p
+              className={formStyles.fieldError}
+              id="openOrderId-error"
+              role="alert"
+            >
               {error}
             </p>
           ) : null}
         </div>
-        <button type="submit" className="button secondary" disabled={isLoading}>
+        <button
+          type="submit"
+          className={`${buttonStyles.button} ${buttonStyles.secondary} ${styles.submitButton}`}
+          disabled={isLoading}
+        >
           <Search aria-hidden="true" size={18} />
           {isLoading ? 'Opening' : 'Open order'}
         </button>

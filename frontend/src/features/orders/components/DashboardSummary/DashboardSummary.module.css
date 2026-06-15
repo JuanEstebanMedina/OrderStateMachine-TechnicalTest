@@ -1,14 +1,11 @@
-.moduleScope {
-}
-
-:global(.summary-grid) {
+.summaryGrid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
 
-:global(.summary-card) {
+.summaryCard {
   display: flex;
   gap: var(--space-3);
   align-items: center;
@@ -20,36 +17,36 @@
   box-shadow: var(--shadow-soft);
 }
 
-:global(.summary-card svg) {
+.summaryCard svg {
   color: var(--color-accent-strong);
   flex: 0 0 auto;
 }
 
-:global(.summary-card p),
-:global(.summary-card strong) {
+.summaryCard p,
+.summaryCard strong {
   display: block;
 }
 
-:global(.summary-card p) {
+.summaryCard p {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 0.85rem;
 }
 
-:global(.summary-card strong) {
+.summaryCard strong {
   color: var(--color-text-strong);
   font-size: 1.45rem;
   line-height: 1.2;
 }
 
 @media (max-width: 980px) {
-  :global(.summary-grid) {
+  .summaryGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 640px) {
-  :global(.summary-grid) {
+  .summaryGrid {
     grid-template-columns: 1fr;
   }
 }

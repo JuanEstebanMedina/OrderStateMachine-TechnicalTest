@@ -7,11 +7,11 @@ type LoadingStateProps = {
 export function LoadingState({ label = 'Loading' }: LoadingStateProps) {
   return (
     <div
-      className={`${styles.moduleScope} loading-state`}
+      className={styles.loadingState}
       role="status"
       aria-live="polite"
     >
-      <span className="loading-dot" aria-hidden="true" />
+      <span className={styles.loadingDot} aria-hidden="true" />
       {label}
     </div>
   );

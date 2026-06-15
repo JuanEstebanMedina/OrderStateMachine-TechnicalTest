@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CreateOrderForm } from './CreateOrderForm';
 
 describe('CreateOrderForm', () => {
-  it('parses comma-separated product IDs, removes blanks and duplicates, and sends the DTO', async () => {
+  it('parses mixed product ID separators, removes blanks and duplicates, and sends the DTO', async () => {
     const user = userEvent.setup();
     const onCreate = vi.fn().mockResolvedValue(undefined);
 
@@ -13,13 +13,13 @@ describe('CreateOrderForm', () => {
 
     await user.type(
       screen.getByLabelText(/product IDs/i),
-      ' product-1, product-2, product-1,, ',
+      ' product-1, product-2\nproduct-1\n\nproduct-3,, ',
     );
     await user.type(screen.getByLabelText(/amount in USD/i), '25.5');
     await user.click(screen.getByRole('button', { name: /create order/i }));
 
     expect(onCreate).toHaveBeenCalledWith({
-      productIds: ['product-1', 'product-2'],
+      productIds: ['product-1', 'product-2', 'product-3'],
       amount: 25.5,
     });
   });

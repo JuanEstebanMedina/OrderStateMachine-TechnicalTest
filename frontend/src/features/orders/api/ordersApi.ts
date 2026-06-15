@@ -8,18 +8,23 @@ import type {
   OrderSummary,
 } from '../model/order.types';
 
-export async function getHealth(): Promise<HealthResponse> {
-  const response = await apiClient.get<HealthResponse>('/health');
+export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
+  const response = await apiClient.get<HealthResponse>('/health', { signal });
   return response.data;
 }
 
-export async function listOrders(): Promise<OrderSummary[]> {
-  const response = await apiClient.get<OrderSummary[]>('/orders');
+export async function listOrders(signal?: AbortSignal): Promise<OrderSummary[]> {
+  const response = await apiClient.get<OrderSummary[]>('/orders', { signal });
   return response.data;
 }
 
-export async function getOrder(orderId: string): Promise<OrderDetail> {
-  const response = await apiClient.get<OrderDetail>(`/orders/${orderId}`);
+export async function getOrder(
+  orderId: string,
+  signal?: AbortSignal,
+): Promise<OrderDetail> {
+  const response = await apiClient.get<OrderDetail>(`/orders/${orderId}`, {
+    signal,
+  });
   return response.data;
 }
 
@@ -43,9 +48,11 @@ export async function applyOrderEvent(
 
 export async function getAvailableEvents(
   orderId: string,
+  signal?: AbortSignal,
 ): Promise<AvailableEventsResponse['events']> {
   const response = await apiClient.get<AvailableEventsResponse>(
     `/orders/${orderId}/available-events`,
+    { signal },
   );
   return response.data.events;
 }

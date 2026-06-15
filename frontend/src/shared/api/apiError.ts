@@ -40,6 +40,10 @@ export function getApiErrorStatus(error: unknown): number | undefined {
   return undefined;
 }
 
+export function isApiCancelError(error: unknown): boolean {
+  return axios.isCancel(error);
+}
+
 export function getApiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     if (!error.response) {

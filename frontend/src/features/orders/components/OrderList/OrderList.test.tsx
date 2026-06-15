@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { baseSummary, secondSummary } from '../../test/factories';
 import { OrderList } from './OrderList';
+import { stateMachineDefinition } from '../../test/factories';
 
 function openOrderName(orderId: string) {
   return new RegExp(`open order\\s+${orderId}`, 'i');
@@ -15,6 +16,7 @@ function renderOrderList(onSelect = vi.fn()) {
       error={null}
       isLoading={false}
       orders={[baseSummary, secondSummary]}
+      states={stateMachineDefinition.states}
       selectedOrderId={baseSummary.orderId}
       onRetry={vi.fn()}
       onSelect={onSelect}

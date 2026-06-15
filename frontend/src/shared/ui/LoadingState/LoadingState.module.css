@@ -1,14 +1,11 @@
-.moduleScope {
-}
-
-:global(.loading-state) {
+.loadingState {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   color: var(--color-text-muted);
 }
 
-:global(.loading-dot) {
+.loadingDot {
   width: 10px;
   height: 10px;
   border-radius: 999px;
