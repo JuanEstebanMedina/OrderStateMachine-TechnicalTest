@@ -4,9 +4,9 @@ import { formatDateTime } from '../../../../shared/utils/date';
 import { formatMetadata, formatOrderEvent } from '../../utils/orderFormatters';
 import { StateBadge } from '../StateBadge/StateBadge';
 
-type HistoryTimelineProps = {
+type HistoryTimelineProps = Readonly<{
   history: OrderHistoryEntry[];
-};
+}>;
 
 function historyKey(entry: OrderHistoryEntry, index: number): string {
   return `${entry.createdAt}-${entry.eventType}-${entry.fromState}-${entry.toState}-${index}`;

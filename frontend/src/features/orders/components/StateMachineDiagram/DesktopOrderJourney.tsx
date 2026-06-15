@@ -10,10 +10,10 @@ import type { OrderState } from '../../model/orderStates';
 import type { StateMachineDefinition } from '../../model/stateMachine.types';
 import { formatOrderState } from '../../utils/orderFormatters';
 
-type DesktopOrderJourneyProps = {
+type DesktopOrderJourneyProps = Readonly<{
   definition: StateMachineDefinition;
   model: JourneyModel;
-};
+}>;
 
 const NODE_WIDTH = 136;
 const NODE_HEIGHT = 52;

@@ -8,7 +8,7 @@ from app.schemas import StateMachineDefinitionResponse
 router = APIRouter(tags=["state-machine"])
 
 
-@router.get("/state-machine", response_model=StateMachineDefinitionResponse)
+@router.get("/state-machine")
 def get_state_machine_definition(
     state_machine: StateMachineDependency,
 ) -> StateMachineDefinitionResponse:

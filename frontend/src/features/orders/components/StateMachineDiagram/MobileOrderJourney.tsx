@@ -7,10 +7,10 @@ import {
 import type { StateMachineDefinition } from '../../model/stateMachine.types';
 import { formatOrderEvent, formatOrderState } from '../../utils/orderFormatters';
 
-type MobileOrderJourneyProps = {
+type MobileOrderJourneyProps = Readonly<{
   definition: StateMachineDefinition;
   model: JourneyModel;
-};
+}>;
 
 export function MobileOrderJourney({
   definition,

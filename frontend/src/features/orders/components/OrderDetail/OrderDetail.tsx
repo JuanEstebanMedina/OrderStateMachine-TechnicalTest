@@ -12,11 +12,11 @@ import buttonStyles from '../../../../shared/styles/buttons.module.css';
 import formStyles from '../../../../shared/styles/forms.module.css';
 import layoutStyles from '../../../../shared/styles/layout.module.css';
 
-type OrderDetailProps = {
+type OrderDetailProps = Readonly<{
   error: string | null;
   isLoading: boolean;
   order: OrderDetailType | null;
-};
+}>;
 
 export function OrderDetail({ error, isLoading, order }: OrderDetailProps) {
   const [copied, setCopied] = useState(false);
@@ -62,7 +62,7 @@ export function OrderDetail({ error, isLoading, order }: OrderDetailProps) {
 
     await navigator.clipboard.writeText(order.orderId);
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
+    globalThis.setTimeout(() => setCopied(false), 1500);
   }
 
   return (

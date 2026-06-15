@@ -1,9 +1,9 @@
 import styles from './EmptyState.module.css';
 
-type EmptyStateProps = {
+type EmptyStateProps = Readonly<{
   title: string;
   message: string;
-};
+}>;
 
 export function EmptyState({ title, message }: EmptyStateProps) {
   return (

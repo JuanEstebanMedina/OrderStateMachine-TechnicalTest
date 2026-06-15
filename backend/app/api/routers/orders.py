@@ -45,7 +45,7 @@ def get_order(
     return order_service.get_order(order_id)
 
 
-@router.get("/{order_id}/available-events", response_model=AvailableEventsResponse)
+@router.get("/{order_id}/available-events")
 def get_available_events(
     order_id: UUID,
     order_service: OrderServiceDependency,

@@ -4,11 +4,11 @@ import styles from './ProductIdsField.module.css';
 import formStyles from '../../../../shared/styles/forms.module.css';
 import { parseProductIds } from './productIdsParser';
 
-type ProductIdsFieldProps = {
+type ProductIdsFieldProps = Readonly<{
   error?: string;
   value: string;
   onChange: (value: string) => void;
-};
+}>;
 
 export function ProductIdsField({
   error,

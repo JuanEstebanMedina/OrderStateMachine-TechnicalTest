@@ -10,10 +10,10 @@ import buttonStyles from '../../../../shared/styles/buttons.module.css';
 import formStyles from '../../../../shared/styles/forms.module.css';
 import layoutStyles from '../../../../shared/styles/layout.module.css';
 
-type CreateOrderFormProps = {
+type CreateOrderFormProps = Readonly<{
   isSubmitting: boolean;
   onCreate: (request: CreateOrderRequest) => Promise<void>;
-};
+}>;
 
 type FormErrors = {
   productIds?: string;

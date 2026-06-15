@@ -335,9 +335,9 @@ describe('App race-condition behavior', () => {
       },
     );
     vi.mocked(getAvailableEvents)
-      .mockImplementationOnce((_orderId: string, signal?: AbortSignal) => {
+      .mockImplementationOnce(async (_orderId: string, signal?: AbortSignal) => {
         failedEventsSignal = signal;
-        return Promise.reject(createApiError(500, 'Available events failed'));
+        throw createApiError(500, 'Available events failed');
       })
       .mockImplementationOnce((_orderId: string, signal?: AbortSignal) => {
         retriedEventsSignal = signal;

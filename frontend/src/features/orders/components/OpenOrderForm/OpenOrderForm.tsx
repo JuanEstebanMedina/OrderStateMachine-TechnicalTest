@@ -10,10 +10,10 @@ import layoutStyles from '../../../../shared/styles/layout.module.css';
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type OpenOrderFormProps = {
+type OpenOrderFormProps = Readonly<{
   isLoading: boolean;
   onOpen: (orderId: string) => Promise<unknown>;
-};
+}>;
 
 export function OpenOrderForm({ isLoading, onOpen }: OpenOrderFormProps) {
   const [orderId, setOrderId] = useState('');

@@ -13,7 +13,7 @@ import buttonStyles from '../../../../shared/styles/buttons.module.css';
 import formStyles from '../../../../shared/styles/forms.module.css';
 import layoutStyles from '../../../../shared/styles/layout.module.css';
 
-type EventFormProps = {
+type EventFormProps = Readonly<{
   availableEvents: OrderEventType[];
   currentState: OrderState | null;
   loadError: string | null;
@@ -23,7 +23,7 @@ type EventFormProps = {
   stateMachine: StateMachineDefinition | null;
   onApply: (request: ApplyOrderEventRequest) => Promise<void>;
   onRetry: () => void;
-};
+}>;
 
 function parseMetadata(value: string): OrderMetadata {
   const parsed = JSON.parse(value) as unknown;
@@ -106,9 +106,9 @@ export function EventForm({
       </div>
 
       {isLoading ? (
-        <p className={formStyles.muted} role="status">
+        <output className={formStyles.muted} aria-live="polite">
           Loading available events.
-        </p>
+        </output>
       ) : null}
 
       {loadError ? (

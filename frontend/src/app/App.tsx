@@ -44,35 +44,12 @@ const App = () => {
       <AppHeader
         health={health}
         isRefreshing={loading.refresh}
-        onRefresh={() => void refreshDashboard()}
+        onRefresh={() => refreshDashboard()}
       />
       <main className={styles.dashboardMain}>
         <FeedbackAlert feedback={feedback} onDismiss={clearFeedback} />
 
-        {!isWorkspaceMode ? (
-          <div className={styles.overviewLayout}>
-            <DashboardSummary orders={orders} />
-            <div className={styles.actionGrid}>
-              <CreateOrderForm
-                isSubmitting={loading.create}
-                onCreate={createNewOrder}
-              />
-              <OpenOrderForm
-                isLoading={loading.detail}
-                onOpen={openOrder}
-              />
-            </div>
-            <OrderList
-              error={listError}
-              isLoading={loading.summaries}
-              orders={orders}
-              states={stateMachine?.states ?? []}
-              selectedOrderId={selectedOrderId}
-              onRetry={() => void refreshSummaries()}
-              onSelect={(orderId) => void openOrder(orderId)}
-            />
-          </div>
-        ) : (
+        {isWorkspaceMode ? (
           <div className={styles.workspaceLayout}>
             <button
               type="button"
@@ -81,11 +58,7 @@ const App = () => {
             >
               Back to orders
             </button>
-            <OrderDetail
-              error={detailError}
-              isLoading={loading.detail}
-              order={selectedOrder}
-            />
+            <OrderDetail error={detailError} isLoading={loading.detail} order={selectedOrder} />
 
             {selectedOrder ? (
               <>
@@ -98,7 +71,7 @@ const App = () => {
                   loadError={availableEventsError}
                   stateMachine={stateMachine}
                   onApply={applyEventToSelectedOrder}
-                  onRetry={() => void retryAvailableEvents()}
+                  onRetry={() => retryAvailableEvents()}
                 />
                 <section
                   className={`${layoutStyles.panel} ${styles.historyPanel}`}
@@ -118,6 +91,23 @@ const App = () => {
               error={diagramError}
               isLoading={loading.diagram}
               order={selectedOrder}
+            />
+          </div>
+        ) : (
+          <div className={styles.overviewLayout}>
+            <DashboardSummary orders={orders} />
+            <div className={styles.actionGrid}>
+              <CreateOrderForm isSubmitting={loading.create} onCreate={createNewOrder} />
+              <OpenOrderForm isLoading={loading.detail} onOpen={openOrder} />
+            </div>
+            <OrderList
+              error={listError}
+              isLoading={loading.summaries}
+              orders={orders}
+              states={stateMachine?.states ?? []}
+              selectedOrderId={selectedOrderId}
+              onRetry={() => refreshSummaries()}
+              onSelect={(orderId) => openOrder(orderId)}
             />
           </div>
         )}
