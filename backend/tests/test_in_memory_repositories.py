@@ -26,7 +26,6 @@ MISSING_ORDER_ID = UUID("11111111-1111-1111-1111-111111111199")
 EVENT_ID = UUID("22222222-2222-2222-2222-222222222222")
 SECOND_EVENT_ID = UUID("22222222-2222-2222-2222-222222222223")
 TICKET_ID = UUID("33333333-3333-3333-3333-333333333333")
-MISSING_TICKET_ID = UUID("33333333-3333-3333-3333-333333333399")
 
 
 def event_log(
@@ -149,7 +148,6 @@ def test_commit_transition_persists_ticket_atomically() -> None:
         expected_version=0,
     )
 
-    assert ticket_repository.get_by_id(TICKET_ID) == ticket
     assert ticket_repository.list_by_order_id(ORDER_ID) == [ticket]
 
 
@@ -181,8 +179,7 @@ def test_stale_expected_version_raises_conflict_without_partial_writes() -> None
     stored_order = order_repository.get_by_id(ORDER_ID)
     assert stored_order is not None
     assert stored_order.history == [first_log]
-    assert ticket_repository.get_by_id(TICKET_ID) is None
-    assert ticket_repository.list_all() == []
+    assert ticket_repository.list_by_order_id(ORDER_ID) == []
 
 
 def test_stale_from_state_raises_conflict() -> None:
@@ -231,21 +228,20 @@ def test_returned_support_ticket_changes_do_not_mutate_repository_storage() -> N
         expected_version=0,
     )
 
-    retrieved_ticket = ticket_repository.get_by_id(TICKET_ID)
-    assert retrieved_ticket is not None
+    retrieved_ticket = ticket_repository.list_by_order_id(ORDER_ID)[0]
 
     retrieved_ticket.reason = "Changed reason"
     retrieved_ticket.metadata["amount"] = 900.0
 
-    stored_ticket = ticket_repository.get_by_id(TICKET_ID)
+    stored_ticket = ticket_repository.list_by_order_id(ORDER_ID)[0]
 
     assert stored_ticket == ticket
 
 
-def test_returns_none_when_support_ticket_does_not_exist() -> None:
+def test_empty_list_when_order_has_no_support_tickets() -> None:
     _order_repository, ticket_repository = create_repositories()
 
-    assert ticket_repository.get_by_id(MISSING_TICKET_ID) is None
+    assert ticket_repository.list_by_order_id(ORDER_ID) == []
 
 
 def test_different_orders_can_transition_concurrently() -> None:
@@ -318,4 +314,4 @@ def test_two_stale_updates_to_same_order_allow_exactly_one_success() -> None:
     assert stored_order is not None
     assert stored_order.version == 1
     assert len(stored_order.history) == 1
-    assert len(ticket_repository.list_all()) == 1
+    assert len(ticket_repository.list_by_order_id(ORDER_ID)) == 1
