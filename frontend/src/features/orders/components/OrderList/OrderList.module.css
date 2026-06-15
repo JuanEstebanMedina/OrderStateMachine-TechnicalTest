@@ -1,0 +1,113 @@
+.orderListPanel {
+  min-width: 0;
+}
+
+.listFilters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.searchField {
+  position: relative;
+  display: block;
+}
+
+.searchField svg {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  color: var(--color-text-muted);
+}
+
+.searchControl {
+  padding-left: 40px;
+}
+
+.orderCardList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 280px));
+  justify-content: start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.orderCard {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.selectedOrderCard {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.16);
+}
+
+.orderCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.orderCard h3 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 1.15rem;
+  letter-spacing: 0;
+}
+
+.orderCardFacts {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.orderCardFacts div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.orderCardFacts dt {
+  color: var(--color-text-strong);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.orderCardFacts dd {
+  margin: 0;
+  color: var(--color-text-strong);
+  text-align: right;
+}
+
+.orderCardAction {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .listFilters {
+    grid-template-columns: 1fr;
+  }
+
+  .orderCardList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

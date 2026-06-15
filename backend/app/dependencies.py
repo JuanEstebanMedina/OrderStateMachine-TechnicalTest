@@ -45,3 +45,14 @@ def get_order_service(
         support_ticket_repository=support_ticket_repository,
         state_machine=state_machine,
     )
+
+
+OrderServiceDependency = Annotated[
+    OrderService,
+    Depends(get_order_service),
+]
+
+StateMachineDependency = Annotated[
+    OrderStateMachine,
+    Depends(get_state_machine),
+]

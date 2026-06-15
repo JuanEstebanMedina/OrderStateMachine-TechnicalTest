@@ -1,12 +1,16 @@
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, status
 
-from app.dependencies import get_order_service
+from app.dependencies import OrderServiceDependency, StateMachineDependency
 from app.domain import Order
-from app.schemas import ApplyOrderEventRequest, CreateOrderRequest, OrderResponse
-from app.services import OrderService
+from app.schemas import (
+    ApplyOrderEventRequest,
+    AvailableEventsResponse,
+    CreateOrderRequest,
+    OrderResponse,
+    OrderSummaryResponse,
+)
 
 
 router = APIRouter(
@@ -18,7 +22,7 @@ router = APIRouter(
 @router.post("", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def create_order(
     request: CreateOrderRequest,
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    order_service: OrderServiceDependency,
 ) -> Order:
     return order_service.create_order(
         product_ids=request.product_ids,
@@ -26,9 +30,9 @@ def create_order(
     )
 
 
-@router.get("", response_model=list[OrderResponse])
+@router.get("", response_model=list[OrderSummaryResponse])
 def list_orders(
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    order_service: OrderServiceDependency,
 ) -> list[Order]:
     return order_service.list_orders()
 
@@ -36,16 +40,28 @@ def list_orders(
 @router.get("/{order_id}", response_model=OrderResponse)
 def get_order(
     order_id: UUID,
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    order_service: OrderServiceDependency,
 ) -> Order:
     return order_service.get_order(order_id)
+
+
+@router.get("/{order_id}/available-events", response_model=AvailableEventsResponse)
+def get_available_events(
+    order_id: UUID,
+    order_service: OrderServiceDependency,
+    state_machine: StateMachineDependency,
+) -> AvailableEventsResponse:
+    order = order_service.get_order(order_id)
+    return AvailableEventsResponse(
+        events=state_machine.get_available_events(order.current_state),
+    )
 
 
 @router.post("/{order_id}/events", response_model=OrderResponse)
 def apply_order_event(
     order_id: UUID,
     request: ApplyOrderEventRequest,
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    order_service: OrderServiceDependency,
 ) -> Order:
     return order_service.apply_event(
         order_id=order_id,

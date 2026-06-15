@@ -1,0 +1,53 @@
+.productIdsInput {
+  min-height: 112px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-content: flex-start;
+  max-height: 144px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.token {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  border-radius: 999px;
+  background: var(--color-soft);
+  color: var(--color-text-strong);
+  padding: 4px 8px 4px 10px;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.tokenText {
+  overflow-wrap: anywhere;
+}
+
+.removeButton {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.removeButton:hover {
+  color: var(--color-danger);
+}
+
+.count {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}

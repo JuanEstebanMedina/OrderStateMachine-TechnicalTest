@@ -1,0 +1,46 @@
+.appShell {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(20, 184, 166, 0.08), transparent 260px),
+    var(--color-bg);
+}
+
+.dashboardMain {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 0 0 48px;
+}
+
+.overviewLayout,
+.workspaceLayout {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.actionGrid {
+  display: grid;
+  align-items: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.backButton {
+  width: fit-content;
+}
+
+.historyPanel {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (max-width: 980px) {
+  .actionGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboardMain {
+    width: min(100% - 24px, 1180px);
+  }
+}

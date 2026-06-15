@@ -20,6 +20,11 @@ API routes
 
 Pydantic schemas are HTTP request and response DTOs. Domain models remain independent from FastAPI and Pydantic. Concrete adapters are selected in `app/dependencies.py`, so business logic depends on repository ports rather than infrastructure implementations.
 
+Order creation requests are normalized by the API: product IDs are trimmed,
+empty IDs are rejected, duplicates are removed while preserving order, and the
+amount must be a finite number greater than zero. Invalid create payloads return
+HTTP 422.
+
 ## Running the backend
 
 ```bash
@@ -44,11 +49,58 @@ python -m pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-## Running tests
+Local frontend CORS is enabled by default for:
+
+```text
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+```
+
+Use a comma-separated list when more origins are needed:
+
+```text
+CORS_ALLOWED_ORIGINS=http://localhost:5173,https://your-app.vercel.app
+```
+
+The deployed Vercel origin must be added to `CORS_ALLOWED_ORIGINS` before the
+hosted frontend can call the API.
+
+## Running the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Create a local `.env` file from `frontend/.env.example` when needed:
+
+```text
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+Do not configure a Vite proxy. The frontend calls the configured API URL
+directly, and FastAPI CORS controls allowed browser origins.
+
+The dashboard starts in an overview mode with summary cards, create-order
+controls, a full UUID lookup form, and responsive order cards. Selecting an
+order opens a workspace view with order identity, event application, history,
+and a contextual state-machine diagram. The diagram uses backend transition
+metadata for edges; the default view shows only visited and currently available
+transitions, while the full transition inventory remains available in a
+disclosure.
+
+## Validation
 
 ```bash
 cd backend
 python -m pytest tests
+```
+
+```bash
+cd frontend
+npm run lint
+npm run build
+npm run test:run
 ```
 
 ## API documentation
@@ -65,7 +117,13 @@ http://localhost:8000/docs
 - `POST /orders`
 - `GET /orders`
 - `GET /orders/{order_id}`
+- `GET /orders/{order_id}/available-events`
 - `POST /orders/{order_id}/events`
+- `GET /state-machine`
+
+`GET /orders` returns summaries without `history`. `POST /orders`,
+`GET /orders/{order_id}`, and `POST /orders/{order_id}/events` return detailed
+orders with complete `history`.
 
 Create an order:
 
@@ -93,10 +151,8 @@ Storage is currently in memory and is lost when the Python process stops. Reposi
 
 Each application worker has independent memory. A real database is required for shared persistence across workers or application instances. Atomic persistence of an order update and support ticket creation would require a transaction or Unit of Work in a database-backed implementation.
 
-## Frontend
+## Vercel frontend deployment
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+Vercel is the intended frontend deployment target. Set
+`VITE_API_BASE_URL` to the API Gateway URL when the backend is deployed, and add
+the final Vercel origin to backend `CORS_ALLOWED_ORIGINS`.

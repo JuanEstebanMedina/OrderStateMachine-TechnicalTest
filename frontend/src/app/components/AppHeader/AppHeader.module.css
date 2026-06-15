@@ -1,0 +1,78 @@
+.appHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px 0 22px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--color-accent-strong);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.appHeader h1 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: clamp(1.7rem, 2.4vw, 2.4rem);
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.subtitle {
+  max-width: 680px;
+  margin-top: 8px;
+  color: var(--color-text-muted);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.healthStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 42px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.healthSubtle {
+  padding: 0;
+  color: var(--color-text-muted);
+}
+
+.healthUnavailable {
+  padding: 0 12px;
+  border: 1px solid rgba(220, 38, 38, 0.24);
+  background: rgba(254, 226, 226, 0.72);
+  color: #991b1b;
+}
+
+@media (max-width: 760px) {
+  .appHeader {
+    display: grid;
+    width: min(100% - 24px, 1180px);
+    padding-top: 22px;
+  }
+
+  .headerActions {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 420px) {
+  .appHeader h1 {
+    font-size: 1.7rem;
+  }
+}

@@ -1,0 +1,25 @@
+.stateBadge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(20, 184, 166, 0.12);
+  color: var(--color-accent-strong);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.stateBadge[data-state='Cancelled'] {
+  background: rgba(220, 38, 38, 0.12);
+  color: #991b1b;
+}
+
+.stateBadge[data-state='Refunded'],
+.stateBadge[data-state='Delivered'] {
+  background: rgba(22, 163, 74, 0.12);
+  color: #166534;
+}

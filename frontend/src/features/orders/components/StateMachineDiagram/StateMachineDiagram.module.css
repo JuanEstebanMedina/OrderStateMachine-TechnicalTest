@@ -1,0 +1,279 @@
+.diagramSection {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.diagramLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.diagramLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--color-border-strong);
+}
+
+.currentDot {
+  border-color: var(--color-accent);
+  background: rgba(20, 184, 166, 0.14);
+}
+
+.visitedDot {
+  border-color: rgba(20, 184, 166, 0.36);
+  background: rgba(20, 184, 166, 0.07);
+}
+
+.availableDot {
+  border-color: #ca8a04;
+  background: #fffbeb;
+}
+
+.terminalDot {
+  border-color: var(--color-text-muted);
+  border-style: dashed;
+  background: #ffffff;
+}
+
+.legendLine {
+  width: 22px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-text-muted);
+}
+
+.historicalLegend {
+  background: var(--color-accent);
+}
+
+.availableLegend {
+  border-top: 2px dashed #64748b;
+  background: transparent;
+}
+
+.desktopJourney {
+  display: block;
+}
+
+.diagramScroll {
+  max-width: 100%;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.stateMachineSvg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+.diagramEdge {
+  fill: none;
+  stroke: #64748b;
+  stroke-width: 2;
+}
+
+.historicalEdge {
+  stroke: var(--color-accent);
+  stroke-width: 3;
+}
+
+.availableEdge {
+  stroke: #64748b;
+  stroke-dasharray: 7 5;
+}
+
+.cancelledEdge {
+  stroke: var(--color-danger);
+  stroke-dasharray: 5 6;
+}
+
+.historicalMarker {
+  fill: var(--color-accent);
+}
+
+.availableMarker {
+  fill: #64748b;
+}
+
+.cancelledMarker {
+  fill: var(--color-danger);
+}
+
+.diagramNode rect {
+  fill: #ffffff;
+  stroke: var(--color-border-strong);
+  stroke-width: 2;
+}
+
+.nodeTitle {
+  fill: var(--color-text-strong);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-anchor: middle;
+}
+
+.nodeStatus {
+  fill: var(--color-text-muted);
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.currentNode rect {
+  fill: rgba(20, 184, 166, 0.12);
+  stroke: var(--color-accent);
+  stroke-width: 3;
+}
+
+.visitedNode rect {
+  fill: rgba(20, 184, 166, 0.06);
+}
+
+.availableNode rect {
+  fill: #fffbeb;
+  stroke: #ca8a04;
+  stroke-width: 3;
+}
+
+.terminalNode:not(.availableNode) rect {
+  fill: #ffffff;
+}
+
+.terminalNode rect {
+  stroke-dasharray: 6 4;
+}
+
+.mobileJourney {
+  display: none;
+  gap: var(--space-4);
+}
+
+.mobileStateList,
+.textTransitionList {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mobileStateCard {
+  display: grid;
+  gap: var(--space-2);
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.mobileStateCard div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.mobileStateCard strong {
+  color: var(--color-text-strong);
+}
+
+.mobileStateCard span {
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  text-align: right;
+}
+
+.mobileStateCard ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.transitionLists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.transitionLists h3,
+.mobileJourney h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-strong);
+  font-size: 0.98rem;
+}
+
+.transitionLists ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.transitionInventory {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.transitionInventory summary {
+  color: var(--color-text-strong);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.inventoryScroller {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-top: var(--space-3);
+}
+
+.transitionInventory table {
+  min-width: 560px;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.transitionInventory th,
+.transitionInventory td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 8px;
+  text-align: left;
+}
+
+@media (max-width: 900px) {
+  .desktopJourney {
+    display: none;
+  }
+
+  .mobileJourney {
+    display: grid;
+  }
+
+  .transitionLists {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 360px) {
+  .mobileStateCard div {
+    display: grid;
+  }
+
+  .mobileStateCard span {
+    text-align: left;
+  }
+}
