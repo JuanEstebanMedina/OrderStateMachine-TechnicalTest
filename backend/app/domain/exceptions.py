@@ -1,5 +1,6 @@
 from app.domain.order_event import OrderEventType
 from app.domain.order_state import OrderState
+from uuid import UUID
 
 
 class DomainError(Exception):
@@ -8,6 +9,15 @@ class DomainError(Exception):
 
 class OrderNotFoundError(DomainError):
     pass
+
+
+class OrderVersionConflictError(DomainError):
+    def __init__(self, order_id: UUID, expected_version: int) -> None:
+        self.order_id = order_id
+        self.expected_version = expected_version
+        super().__init__(
+            f"Order {order_id} changed before version {expected_version} could be committed"
+        )
 
 
 class InvalidOrderTransitionError(DomainError):

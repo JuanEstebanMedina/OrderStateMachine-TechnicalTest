@@ -8,11 +8,12 @@ from app.domain import (
     Order,
     OrderEventLog,
     OrderEventType,
+    OrderSummary,
     OrderNotFoundError,
     OrderState,
     SupportTicket,
 )
-from app.ports import OrderRepository, SupportTicketRepository
+from app.ports import OrderRepository
 from app.services.state_machine import OrderStateMachine
 
 
@@ -20,11 +21,9 @@ class OrderService:
     def __init__(
         self,
         order_repository: OrderRepository,
-        support_ticket_repository: SupportTicketRepository,
         state_machine: OrderStateMachine,
     ) -> None:
         self._order_repository = order_repository
-        self._support_ticket_repository = support_ticket_repository
         self._state_machine = state_machine
 
     def create_order(
@@ -39,7 +38,7 @@ class OrderService:
             current_state=OrderState.PENDING,
         )
 
-        return self._order_repository.save(order)
+        return self._order_repository.create(order)
 
     def get_order(self, order_id: UUID) -> Order:
         order = self._order_repository.get_by_id(order_id)
@@ -48,8 +47,8 @@ class OrderService:
 
         return order
 
-    def list_orders(self) -> list[Order]:
-        return self._order_repository.list_all()
+    def list_orders(self) -> list[OrderSummary]:
+        return self._order_repository.list_summaries()
 
     def apply_event(
         self,
@@ -59,43 +58,54 @@ class OrderService:
     ) -> Order:
         order = self.get_order(order_id)
         event_metadata = deepcopy(metadata) if metadata is not None else {}
+        expected_version = order.version
         from_state = order.current_state
         to_state = self._state_machine.get_next_state(from_state, event_type)
+        timestamp = self._utc_now()
 
-        order.current_state = to_state
-        order.updated_at = self._utc_now()
-        order.history.append(
-            OrderEventLog(
-                event_type=event_type,
-                from_state=from_state,
-                to_state=to_state,
-                metadata=deepcopy(event_metadata),
-                created_at=self._utc_now(),
-            )
+        event_log = OrderEventLog(
+            id=uuid.uuid4(),
+            event_type=event_type,
+            from_state=from_state,
+            to_state=to_state,
+            metadata=deepcopy(event_metadata),
+            created_at=timestamp,
+        )
+        updated_order = Order(
+            id=order.id,
+            product_ids=deepcopy(order.product_ids),
+            amount=order.amount,
+            current_state=to_state,
+            history=[*deepcopy(order.history), deepcopy(event_log)],
+            created_at=order.created_at,
+            updated_at=timestamp,
+            version=expected_version + 1,
+        )
+        support_ticket = self._build_support_ticket(
+            order=updated_order,
+            event_type=event_type,
+            metadata=event_metadata,
+            created_at=timestamp,
         )
 
-        self._handle_event(order, event_type, event_metadata)
+        return self._order_repository.commit_transition(
+            order=updated_order,
+            event_log=event_log,
+            support_ticket=support_ticket,
+            expected_version=expected_version,
+        )
 
-        return self._order_repository.save(order)
-
-    def _handle_event(
+    def _build_support_ticket(
         self,
         order: Order,
         event_type: OrderEventType,
         metadata: dict[str, Any],
-    ) -> None:
-        if event_type == OrderEventType.PAYMENT_FAILED:
-            self._handle_payment_failed(order, metadata)
+        created_at: datetime,
+    ) -> SupportTicket | None:
+        if event_type != OrderEventType.PAYMENT_FAILED or order.amount <= 1000:
+            return None
 
-    def _handle_payment_failed(
-        self,
-        order: Order,
-        metadata: dict[str, Any],
-    ) -> None:
-        if order.amount <= 1000:
-            return
-
-        ticket = SupportTicket(
+        return SupportTicket(
             id=uuid.uuid4(),
             order_id=order.id,
             reason="High-value order payment failed",
@@ -103,9 +113,8 @@ class OrderService:
                 "order_amount": order.amount,
                 "event_metadata": deepcopy(metadata),
             },
+            created_at=created_at,
         )
-
-        self._support_ticket_repository.save(ticket)
 
     def _utc_now(self) -> datetime:
         return datetime.now(timezone.utc)

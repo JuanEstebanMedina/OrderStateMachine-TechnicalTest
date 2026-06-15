@@ -5,9 +5,6 @@ from app.domain import SupportTicket
 
 
 class SupportTicketRepository(Protocol):
-    def save(self, ticket: SupportTicket) -> SupportTicket:
-        ...
-
     def get_by_id(self, ticket_id: UUID) -> SupportTicket | None:
         ...
 

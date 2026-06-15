@@ -5,8 +5,9 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
-from app.adapters import InMemoryOrderRepository, InMemorySupportTicketRepository
+from app.adapters import InMemoryOrderRepository, InMemoryStore, InMemorySupportTicketRepository
 from app.dependencies import get_order_service, get_state_machine
+from app.domain import OrderEventType, OrderVersionConflictError
 from app.main import app
 from app.services import OrderService, OrderStateMachine
 
@@ -19,12 +20,12 @@ class ApiTestContext:
 
 @pytest.fixture
 def api_context() -> Generator[ApiTestContext, None, None]:
-    order_repository = InMemoryOrderRepository()
-    support_ticket_repository = InMemorySupportTicketRepository()
+    store = InMemoryStore()
+    order_repository = InMemoryOrderRepository(store)
+    support_ticket_repository = InMemorySupportTicketRepository(store)
     state_machine = OrderStateMachine()
     service = OrderService(
         order_repository=order_repository,
-        support_ticket_repository=support_ticket_repository,
         state_machine=state_machine,
     )
 
@@ -420,6 +421,30 @@ def test_apply_invalid_transition_does_not_mutate_order(
     data = get_response.json()
     assert data["currentState"] == "Pending"
     assert data["history"] == []
+
+
+def test_version_conflict_returns_409(api_context: ApiTestContext) -> None:
+    conflict_order_id = UUID("11111111-1111-1111-1111-111111111188")
+
+    class ConflictService:
+        def apply_event(
+            self,
+            order_id: UUID,
+            event_type: OrderEventType,
+            metadata: dict,
+        ) -> None:
+            raise OrderVersionConflictError(order_id, expected_version=0)
+
+    app.dependency_overrides[get_order_service] = lambda: ConflictService()
+
+    response = api_context.client.post(
+        f"/orders/{conflict_order_id}/events",
+        json={"eventType": "noVerificationNeeded", "metadata": {}},
+    )
+
+    assert response.status_code == 409
+    assert str(conflict_order_id) in response.json()["detail"]
+    assert "version 0" in response.json()["detail"]
 
 
 def test_unknown_event_type_returns_422(api_context: ApiTestContext) -> None:
