@@ -37,6 +37,22 @@ describe('StateMachineDiagram', () => {
     );
   });
 
+  it('represents every known backend state in the desktop graph', () => {
+    const { container } = render(
+      <StateMachineDiagram
+        availableEvents={['paymentSuccessful', 'orderCancelledByUser']}
+        definition={stateMachineDefinition}
+        error={null}
+        isLoading={false}
+        order={baseDetail}
+      />,
+    );
+
+    stateMachineDefinition.states.forEach((state) => {
+      expect(container.querySelector(`[data-state="${state}"]`)).toBeInTheDocument();
+    });
+  });
+
   it('renders historical and available edges from order history and backend metadata', () => {
     const { container } = render(
       <StateMachineDiagram
@@ -52,6 +68,49 @@ describe('StateMachineDiagram', () => {
     expect(container.querySelectorAll('[data-kind="available"]')).toHaveLength(2);
     expect(screen.getAllByText(/payment successful/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/cancelled by user/i).length).toBeGreaterThan(0);
+  });
+
+  it('renders mobile journey content as the alternative representation', () => {
+    render(
+      <StateMachineDiagram
+        availableEvents={['paymentSuccessful', 'orderCancelledByUser']}
+        definition={stateMachineDefinition}
+        error={null}
+        isLoading={false}
+        order={baseDetail}
+      />,
+    );
+
+    expect(screen.getByLabelText(/mobile order journey/i)).toBeInTheDocument();
+    expect(screen.getByText(/historical transitions/i)).toBeInTheDocument();
+  });
+
+  it('keeps responsive SVG attributes and edge-specific arrow markers', () => {
+    const { container } = render(
+      <StateMachineDiagram
+        availableEvents={['paymentSuccessful', 'orderCancelledByUser']}
+        definition={stateMachineDefinition}
+        error={null}
+        isLoading={false}
+        order={baseDetail}
+      />,
+    );
+
+    const svg = screen.getByRole('img', {
+      name: /contextual order journey diagram/i,
+    });
+    expect(svg).toHaveAttribute('viewBox', '0 0 1180 520');
+    expect(svg).toHaveAttribute('preserveAspectRatio', 'xMidYMid meet');
+    expect(container.querySelector('[data-kind="historical"]')).toHaveAttribute(
+      'data-marker-kind',
+      'arrow-historical',
+    );
+    expect(
+      container.querySelector('[data-kind="available"][data-to-state="Confirmed"]'),
+    ).toHaveAttribute('data-marker-kind', 'arrow-available');
+    expect(
+      container.querySelector('[data-kind="available"][data-to-state="Cancelled"]'),
+    ).toHaveAttribute('data-marker-kind', 'arrow-cancelled');
   });
 
   it('groups multiple available events to the same destination into one visual edge', () => {
@@ -109,6 +168,27 @@ describe('StateMachineDiagram', () => {
     expect(
       within(disclosure as HTMLElement).getByText(/pending biometrical verification/i),
     ).toBeInTheDocument();
+  });
+
+  it('does not crash when backend metadata includes unsupported graphical states', () => {
+    render(
+      <StateMachineDiagram
+        availableEvents={[]}
+        definition={{
+          ...stateMachineDefinition,
+          states: [...stateMachineDefinition.states, 'ManualReview'],
+        }}
+        error={null}
+        isLoading={false}
+        order={{
+          ...baseDetail,
+          currentState: 'ManualReview',
+          history: [],
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/manual review/i)).toBeInTheDocument();
   });
 
   it('displays a fallback when the graph request fails', () => {

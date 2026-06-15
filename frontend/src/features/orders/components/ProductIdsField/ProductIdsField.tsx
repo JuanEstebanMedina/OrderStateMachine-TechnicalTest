@@ -39,7 +39,7 @@ export function ProductIdsField({
       </label>
       <textarea
         id="productIds"
-        className={`${formStyles.control} ${formStyles.textarea}`}
+        className={`${formStyles.control} ${formStyles.textarea} ${styles.productIdsInput}`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={'product-1, product-2\nproduct-3'}

@@ -27,7 +27,8 @@
 
 .orderCardList {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 280px));
+  justify-content: start;
   gap: var(--space-3);
   margin: 0;
   padding: 0;
@@ -104,5 +105,9 @@
 @media (max-width: 640px) {
   .listFilters {
     grid-template-columns: 1fr;
+  }
+
+  .orderCardList {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

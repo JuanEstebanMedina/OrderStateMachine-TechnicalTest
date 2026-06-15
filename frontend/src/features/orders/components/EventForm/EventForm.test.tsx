@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { EventForm } from './EventForm';
+import { stateMachineDefinition } from '../../test/factories';
 
 function createConflictError() {
   return new AxiosError(
@@ -23,11 +24,13 @@ function createConflictError() {
 
 describe('EventForm', () => {
   const defaultProps = {
+    currentState: 'Pending' as const,
     isDisabled: false,
     isLoading: false,
     isSubmitting: false,
     loadError: null,
     onRetry: vi.fn(),
+    stateMachine: stateMachineDefinition,
   };
 
   it('renders only events returned by the backend', () => {
@@ -186,5 +189,22 @@ describe('EventForm', () => {
       screen.getByRole('button', { name: /retry available events/i }),
     );
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('selects the first display-ordered event when backend order starts with a terminal transition', () => {
+    render(
+      <EventForm
+        {...defaultProps}
+        availableEvents={['orderCancelledByUser', 'paymentSuccessful']}
+        currentState="PendingPayment"
+        onApply={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText(/^event$/i)).toHaveValue('paymentSuccessful');
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Payment successful',
+      'Cancelled by user',
+    ]);
   });
 });

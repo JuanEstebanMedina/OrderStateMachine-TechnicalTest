@@ -19,7 +19,6 @@ body {
   min-width: 320px;
   margin: 0;
   background: var(--color-bg);
-  overflow-x: hidden;
 }
 
 button,

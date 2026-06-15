@@ -66,6 +66,14 @@ function classForState(state: OrderState, model: JourneyModel): string {
   ].join(' ');
 }
 
+function markerIdForEdge(edge: JourneyEdge) {
+  if (edge.toState === 'Cancelled') {
+    return 'arrow-cancelled';
+  }
+
+  return edge.kind === 'historical' ? 'arrow-historical' : 'arrow-available';
+}
+
 export function DesktopOrderJourney({
   definition,
   model,
@@ -85,14 +93,14 @@ export function DesktopOrderJourney({
         <svg
           className={styles.stateMachineSvg}
           viewBox="0 0 1180 520"
+          preserveAspectRatio="xMidYMid meet"
           role="img"
           aria-labelledby="diagram-svg-title"
         >
           <title id="diagram-svg-title">Contextual order journey diagram</title>
           <defs>
             <marker
-              className={styles.arrowMarker}
-              id="arrow"
+              id="arrow-historical"
               viewBox="0 0 10 10"
               refX="8"
               refY="5"
@@ -100,7 +108,29 @@ export function DesktopOrderJourney({
               markerHeight="6"
               orient="auto-start-reverse"
             >
-              <path d="M 0 0 L 10 5 L 0 10 z" />
+              <path className={styles.historicalMarker} d="M 0 0 L 10 5 L 0 10 z" />
+            </marker>
+            <marker
+              id="arrow-available"
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path className={styles.availableMarker} d="M 0 0 L 10 5 L 0 10 z" />
+            </marker>
+            <marker
+              id="arrow-cancelled"
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path className={styles.cancelledMarker} d="M 0 0 L 10 5 L 0 10 z" />
             </marker>
           </defs>
           <g>
@@ -119,9 +149,10 @@ export function DesktopOrderJourney({
                   key={edge.id}
                   className={className}
                   d={path}
-                  markerEnd="url(#arrow)"
+                  markerEnd={`url(#${markerIdForEdge(edge)})`}
                   data-kind={edge.kind}
                   data-to-state={edge.toState}
+                  data-marker-kind={markerIdForEdge(edge)}
                 >
                   <title>{describeTransition(edge)}</title>
                 </path>

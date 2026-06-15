@@ -45,4 +45,25 @@ describe('ProductIdsField', () => {
 
     expect(onChange).toHaveBeenCalledWith('product-2');
   });
+
+  it('keeps many unique product IDs represented in the preview', () => {
+    const productIds = Array.from(
+      { length: 24 },
+      (_, index) => `product-${index + 1}`,
+    );
+
+    render(
+      <ProductIdsField
+        value={productIds.join('\n')}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/24 products recognized/i)).toBeInTheDocument();
+    productIds.forEach((productId) => {
+      expect(
+        screen.getByRole('button', { name: `Remove ${productId}` }),
+      ).toBeInTheDocument();
+    });
+  });
 });

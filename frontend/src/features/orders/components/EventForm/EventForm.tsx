@@ -2,9 +2,12 @@ import { type FormEvent, useState } from 'react';
 import { RefreshCw, Send } from 'lucide-react';
 
 import styles from './EventForm.module.css';
+import { orderAvailableEventsForDisplay } from './availableEventPresentation';
 import type { OrderEventType } from '../../model/orderEvents';
+import type { OrderState } from '../../model/orderStates';
 import { formatOrderEvent } from '../../utils/orderFormatters';
 import type { ApplyOrderEventRequest, OrderMetadata } from '../../model/order.types';
+import type { StateMachineDefinition } from '../../model/stateMachine.types';
 import { getApiErrorMessage } from '../../../../shared/api/apiError';
 import buttonStyles from '../../../../shared/styles/buttons.module.css';
 import formStyles from '../../../../shared/styles/forms.module.css';
@@ -12,10 +15,12 @@ import layoutStyles from '../../../../shared/styles/layout.module.css';
 
 type EventFormProps = {
   availableEvents: OrderEventType[];
+  currentState: OrderState | null;
   loadError: string | null;
   isLoading: boolean;
   isSubmitting: boolean;
   isDisabled: boolean;
+  stateMachine: StateMachineDefinition | null;
   onApply: (request: ApplyOrderEventRequest) => Promise<void>;
   onRetry: () => void;
 };
@@ -36,20 +41,28 @@ function parseMetadata(value: string): OrderMetadata {
 
 export function EventForm({
   availableEvents,
+  currentState,
   loadError,
   isLoading,
   isSubmitting,
   isDisabled,
+  stateMachine,
   onApply,
   onRetry,
 }: EventFormProps) {
   const [selectedEvent, setSelectedEvent] = useState<OrderEventType | ''>('');
   const [metadataValue, setMetadataValue] = useState('{}');
   const [error, setError] = useState<string | null>(null);
+  const displayEvents = orderAvailableEventsForDisplay({
+    availableEvents,
+    currentState,
+    states: stateMachine?.states,
+    transitions: stateMachine?.transitions,
+  });
   const selectedEventValue =
-    selectedEvent && availableEvents.includes(selectedEvent)
+    selectedEvent && displayEvents.includes(selectedEvent)
       ? selectedEvent
-      : availableEvents[0] ?? '';
+      : displayEvents[0] ?? '';
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -133,7 +146,7 @@ export function EventForm({
               }
               disabled={isSubmitting}
             >
-              {availableEvents.map((eventType) => (
+              {displayEvents.map((eventType) => (
                 <option key={eventType} value={eventType}>
                   {formatOrderEvent(eventType)}
                 </option>

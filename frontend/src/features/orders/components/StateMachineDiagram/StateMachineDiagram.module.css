@@ -2,7 +2,6 @@
   display: grid;
   gap: var(--space-4);
   min-width: 0;
-  overflow: hidden;
 }
 
 .diagramLegend {
@@ -31,11 +30,11 @@
 }
 
 .visitedDot {
-  background: var(--color-text-muted);
+  background: #99f6e4;
 }
 
 .availableDot {
-  background: #16a34a;
+  background: #facc15;
 }
 
 .terminalDot {
@@ -54,7 +53,8 @@
 }
 
 .availableLegend {
-  background: #16a34a;
+  border-top: 2px dashed #64748b;
+  background: transparent;
 }
 
 .desktopJourney {
@@ -62,39 +62,49 @@
 }
 
 .diagramScroll {
-  overflow-x: auto;
-  overflow-y: hidden;
   max-width: 100%;
-  padding-bottom: var(--space-2);
+  border-radius: 8px;
+  background: #f8fafc;
 }
 
 .stateMachineSvg {
   display: block;
-  width: 1180px;
-  max-width: none;
+  width: 100%;
+  max-width: 100%;
   height: auto;
 }
 
 .diagramEdge {
   fill: none;
-  stroke-width: 3;
+  stroke: #64748b;
+  stroke-width: 2;
 }
 
 .historicalEdge {
   stroke: var(--color-accent);
+  stroke-width: 3;
 }
 
 .availableEdge {
-  stroke: #16a34a;
-  stroke-dasharray: 8 7;
+  stroke: #64748b;
+  stroke-dasharray: 7 5;
 }
 
 .cancelledEdge {
   stroke: var(--color-danger);
+  stroke-dasharray: 5 6;
 }
 
-.arrowMarker path {
-  fill: currentColor;
+.historicalMarker {
+  fill: var(--color-accent);
+}
+
+.availableMarker {
+  fill: #64748b;
+}
+
+.cancelledMarker {
+  fill: var(--color-danger);
 }
 
 .diagramNode rect {
@@ -117,20 +127,23 @@
 }
 
 .currentNode rect {
-  fill: rgba(20, 184, 166, 0.12);
+  fill: rgba(20, 184, 166, 0.22);
   stroke: var(--color-accent);
+  stroke-width: 3;
 }
 
 .visitedNode rect {
-  fill: var(--color-soft);
+  fill: rgba(20, 184, 166, 0.1);
 }
 
 .availableNode rect {
-  stroke: #16a34a;
+  fill: #fef9c3;
+  stroke: #ca8a04;
+  stroke-width: 3;
 }
 
 .terminalNode rect {
-  stroke: var(--color-danger);
+  stroke-dasharray: 6 4;
 }
 
 .mobileJourney {
@@ -230,7 +243,7 @@
   text-align: left;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .desktopJourney {
     display: none;
   }

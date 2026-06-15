@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -31,6 +31,11 @@ describe('OrderList', () => {
     renderOrderList();
 
     expect(screen.getByRole('list', { name: /order cards/i })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: /order cards/i })).getAllByRole(
+        'listitem',
+      ),
+    ).toHaveLength(2);
     expect(screen.getByText('11111111')).toBeInTheDocument();
     expect(screen.getByText('22222222')).toBeInTheDocument();
     expect(screen.getAllByText('Pending').length).toBeGreaterThan(0);
@@ -43,6 +48,11 @@ describe('OrderList', () => {
 
     await user.type(screen.getByLabelText(/search orders/i), '22222222');
 
+    expect(
+      within(screen.getByRole('list', { name: /order cards/i })).getAllByRole(
+        'listitem',
+      ),
+    ).toHaveLength(1);
     expect(screen.queryByText('11111111')).not.toBeInTheDocument();
     expect(screen.getByText('22222222')).toBeInTheDocument();
   });

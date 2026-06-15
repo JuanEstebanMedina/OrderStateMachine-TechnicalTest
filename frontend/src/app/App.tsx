@@ -91,10 +91,12 @@ const App = () => {
               <>
                 <EventForm
                   availableEvents={availableEvents}
+                  currentState={selectedOrder.currentState}
                   isDisabled={!selectedOrder}
                   isLoading={loading.availableEvents}
                   isSubmitting={loading.event}
                   loadError={availableEventsError}
+                  stateMachine={stateMachine}
                   onApply={applyEventToSelectedOrder}
                   onRetry={() => void retryAvailableEvents()}
                 />
