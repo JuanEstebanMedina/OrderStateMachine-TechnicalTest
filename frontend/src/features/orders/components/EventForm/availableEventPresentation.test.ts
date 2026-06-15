@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { orderAvailableEventsForDisplay } from './availableEventPresentation';
+import { buildTransition } from '../../test/factories';
 import type { OrderEventType } from '../../model/orderEvents';
 import type { OrderState } from '../../model/orderStates';
 import type { StateMachineTransition } from '../../model/stateMachine.types';
@@ -16,41 +17,17 @@ const states: OrderState[] = [
 ];
 
 const transitions: StateMachineTransition[] = [
-  {
-    fromState: 'PendingPayment',
-    eventType: 'orderCancelledByUser',
-    toState: 'Cancelled',
-  },
-  {
-    fromState: 'PendingPayment',
-    eventType: 'paymentSuccessful',
-    toState: 'Confirmed',
-  },
-  {
-    fromState: 'OnHold',
-    eventType: 'verificationFailed',
-    toState: 'Cancelled',
-  },
-  {
-    fromState: 'OnHold',
-    eventType: 'biometricalVerificationSuccessful',
-    toState: 'PendingPayment',
-  },
-  {
-    fromState: 'OnHold',
-    eventType: 'orderCancelledByUser',
-    toState: 'Cancelled',
-  },
-  {
-    fromState: 'Confirmed',
-    eventType: 'preparingShipment',
-    toState: 'Processing',
-  },
-  {
-    fromState: 'Processing',
-    eventType: 'orderCancelled',
-    toState: 'Cancelled',
-  },
+  buildTransition('PendingPayment', 'orderCancelledByUser', 'Cancelled'),
+  buildTransition('PendingPayment', 'paymentSuccessful', 'Confirmed'),
+  buildTransition('OnHold', 'verificationFailed', 'Cancelled'),
+  buildTransition(
+    'OnHold',
+    'biometricalVerificationSuccessful',
+    'PendingPayment',
+  ),
+  buildTransition('OnHold', 'orderCancelledByUser', 'Cancelled'),
+  buildTransition('Confirmed', 'preparingShipment', 'Processing'),
+  buildTransition('Processing', 'orderCancelled', 'Cancelled'),
 ];
 
 function orderEvents(
@@ -71,15 +48,6 @@ function orderEvents(
 
 describe('orderAvailableEventsForDisplay', () => {
   it('orders non-terminal transitions before terminal transitions', () => {
-    expect(
-      orderEvents('PendingPayment', [
-        'orderCancelledByUser',
-        'paymentSuccessful',
-      ]),
-    ).toEqual(['paymentSuccessful', 'orderCancelledByUser']);
-  });
-
-  it('keeps PendingPayment paymentSuccessful before orderCancelledByUser', () => {
     expect(
       orderEvents('PendingPayment', [
         'orderCancelledByUser',

@@ -2,12 +2,15 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { baseSummary, secondSummary } from '../../test/factories';
+import {
+  baseSummary,
+  secondSummary,
+  stateMachineDefinition,
+} from '../../test/factories';
 import { OrderList } from './OrderList';
-import { stateMachineDefinition } from '../../test/factories';
 
 function openOrderName(orderId: string) {
-  return new RegExp(`open order\\s+${orderId}`, 'i');
+  return new RegExp(String.raw`open order\s+${orderId}`, 'i');
 }
 
 function renderOrderList(onSelect = vi.fn()) {
