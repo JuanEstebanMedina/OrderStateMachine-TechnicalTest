@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, status
 
 from app.dependencies import OrderServiceDependency, StateMachineDependency
-from app.domain import Order
+from app.domain import Order, OrderSummary
 from app.schemas import (
     ApplyOrderEventRequest,
     AvailableEventsResponse,
@@ -33,7 +33,7 @@ def create_order(
 @router.get("", response_model=list[OrderSummaryResponse])
 def list_orders(
     order_service: OrderServiceDependency,
-) -> list[Order]:
+) -> list[OrderSummary]:
     return order_service.list_orders()
 
 

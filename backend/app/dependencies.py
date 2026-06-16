@@ -1,25 +1,47 @@
 from typing import Annotated
 
+import boto3
 from fastapi import Depends
 
-from app.adapters import InMemoryOrderRepository, InMemorySupportTicketRepository
-from app.ports import OrderRepository, SupportTicketRepository
+from app.adapters import (
+    DynamoDBOrderRepository,
+    InMemoryOrderRepository,
+    InMemoryStore,
+)
+from app.config import (
+    get_aws_region,
+    get_dynamodb_endpoint_url,
+    get_dynamodb_table_name,
+    get_persistence_backend,
+)
+from app.ports import OrderRepository
 from app.services import OrderService, OrderStateMachine
 
 
-_order_repository: OrderRepository = InMemoryOrderRepository()
-_support_ticket_repository: SupportTicketRepository = (
-    InMemorySupportTicketRepository()
-)
+def _create_dynamodb_client():
+    return boto3.client(
+        "dynamodb",
+        region_name=get_aws_region(),
+        endpoint_url=get_dynamodb_endpoint_url(),
+    )
+
+
+def _create_order_repository() -> OrderRepository:
+    if get_persistence_backend() == "memory":
+        in_memory_store = InMemoryStore()
+        return InMemoryOrderRepository(in_memory_store)
+
+    client = _create_dynamodb_client()
+    table_name = get_dynamodb_table_name()
+    return DynamoDBOrderRepository(client, table_name)
+
+
+_order_repository = _create_order_repository()
 _state_machine = OrderStateMachine()
 
 
 def get_order_repository() -> OrderRepository:
     return _order_repository
-
-
-def get_support_ticket_repository() -> SupportTicketRepository:
-    return _support_ticket_repository
 
 
 def get_state_machine() -> OrderStateMachine:
@@ -31,10 +53,6 @@ def get_order_service(
         OrderRepository,
         Depends(get_order_repository),
     ],
-    support_ticket_repository: Annotated[
-        SupportTicketRepository,
-        Depends(get_support_ticket_repository),
-    ],
     state_machine: Annotated[
         OrderStateMachine,
         Depends(get_state_machine),
@@ -42,7 +60,6 @@ def get_order_service(
 ) -> OrderService:
     return OrderService(
         order_repository=order_repository,
-        support_ticket_repository=support_ticket_repository,
         state_machine=state_machine,
     )
 

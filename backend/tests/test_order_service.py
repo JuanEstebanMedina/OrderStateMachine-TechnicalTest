@@ -11,9 +11,10 @@ from app.domain import (
     OrderEventType,
     OrderNotFoundError,
     OrderState,
+    OrderSummary,
     SupportTicket,
 )
-from app.ports import OrderRepository, SupportTicketRepository
+from app.ports import OrderRepository
 from app.services import OrderService, OrderStateMachine
 
 
@@ -21,50 +22,46 @@ ORDER_ID = UUID("11111111-1111-1111-1111-111111111111")
 SECOND_ORDER_ID = UUID("11111111-1111-1111-1111-111111111112")
 MISSING_ORDER_ID = UUID("11111111-1111-1111-1111-111111111199")
 GENERATED_ORDER_ID = UUID("33333333-3333-3333-3333-333333333333")
-GENERATED_TICKET_ID = UUID("44444444-4444-4444-4444-444444444444")
+GENERATED_EVENT_ID = UUID("44444444-4444-4444-4444-444444444444")
+GENERATED_TICKET_ID = UUID("55555555-5555-5555-5555-555555555555")
 
 
-def create_service() -> tuple[OrderService, Mock, Mock]:
+def create_service() -> tuple[OrderService, Mock]:
     order_repository = create_autospec(OrderRepository, instance=True)
-    support_ticket_repository = create_autospec(
-        SupportTicketRepository,
-        instance=True,
-    )
-    order_repository.save.side_effect = lambda order: order
+    order_repository.commit_transition.side_effect = lambda **kwargs: kwargs["order"]
 
     service = OrderService(
         order_repository=order_repository,
-        support_ticket_repository=support_ticket_repository,
         state_machine=OrderStateMachine(),
     )
 
-    return service, order_repository, support_ticket_repository
+    return service, order_repository
 
 
-def test_create_order_uses_generated_uuid_and_saves_order() -> None:
-    service, order_repository, _ = create_service()
+def test_create_order_uses_generated_uuid_and_creates_order() -> None:
+    service, order_repository = create_service()
     saved_order = Order(
         id=GENERATED_ORDER_ID,
         product_ids=["product-1"],
         amount=100.0,
     )
-    order_repository.save.return_value = saved_order
-    order_repository.save.side_effect = None
+    order_repository.create.return_value = saved_order
 
     with patch("app.services.order_service.uuid.uuid4", return_value=GENERATED_ORDER_ID):
         result = service.create_order(product_ids=["product-1"], amount=100.0)
 
-    order_repository.save.assert_called_once()
-    created_order = order_repository.save.call_args.args[0]
+    order_repository.create.assert_called_once()
+    created_order = order_repository.create.call_args.args[0]
     assert isinstance(created_order.id, UUID)
     assert created_order.id == GENERATED_ORDER_ID
     assert created_order.current_state == OrderState.PENDING
     assert created_order.history == []
+    assert created_order.version == 0
     assert result == saved_order
 
 
 def test_get_order_returns_existing_order() -> None:
-    service, order_repository, _ = create_service()
+    service, order_repository = create_service()
     order = Order(id=ORDER_ID, product_ids=["product-1"], amount=100.0)
     order_repository.get_by_id.return_value = order
 
@@ -72,26 +69,41 @@ def test_get_order_returns_existing_order() -> None:
 
 
 def test_get_order_raises_when_order_does_not_exist() -> None:
-    service, order_repository, _ = create_service()
+    service, order_repository = create_service()
     order_repository.get_by_id.return_value = None
 
     with pytest.raises(OrderNotFoundError):
         service.get_order(MISSING_ORDER_ID)
 
 
-def test_list_orders_returns_repository_result() -> None:
-    service, order_repository, _ = create_service()
-    orders = [
-        Order(id=ORDER_ID, product_ids=["product-1"], amount=100.0),
-        Order(id=SECOND_ORDER_ID, product_ids=["product-2"], amount=200.0),
+def test_list_orders_returns_repository_summaries() -> None:
+    service, order_repository = create_service()
+    created_at = datetime.now(timezone.utc)
+    summaries = [
+        OrderSummary(
+            id=ORDER_ID,
+            product_ids=["product-1"],
+            amount=100.0,
+            current_state=OrderState.PENDING,
+            created_at=created_at,
+            updated_at=created_at,
+        ),
+        OrderSummary(
+            id=SECOND_ORDER_ID,
+            product_ids=["product-2"],
+            amount=200.0,
+            current_state=OrderState.CONFIRMED,
+            created_at=created_at,
+            updated_at=created_at,
+        ),
     ]
-    order_repository.list_all.return_value = orders
+    order_repository.list_summaries.return_value = summaries
 
-    assert service.list_orders() == orders
+    assert service.list_orders() == summaries
 
 
-def test_apply_event_updates_state_appends_history_and_saves_order() -> None:
-    service, order_repository, _ = create_service()
+def test_apply_event_builds_updated_order_and_commits_once() -> None:
+    service, order_repository = create_service()
     created_at = datetime.now(timezone.utc) - timedelta(minutes=5)
     order = Order(
         id=ORDER_ID,
@@ -100,29 +112,59 @@ def test_apply_event_updates_state_appends_history_and_saves_order() -> None:
         current_state=OrderState.PENDING_PAYMENT,
         created_at=created_at,
         updated_at=created_at,
+        version=3,
     )
     metadata = {"paymentId": "payment-1"}
     order_repository.get_by_id.return_value = order
 
-    result = service.apply_event(
+    with patch("app.services.order_service.uuid.uuid4", return_value=GENERATED_EVENT_ID):
+        result = service.apply_event(
+            order_id=ORDER_ID,
+            event_type=OrderEventType.PAYMENT_SUCCESSFUL,
+            metadata=metadata,
+        )
+
+    order_repository.commit_transition.assert_called_once()
+    call = order_repository.commit_transition.call_args.kwargs
+    event_log = call["event_log"]
+    committed_order = call["order"]
+
+    assert call["expected_version"] == 3
+    assert call["support_ticket"] is None
+    assert event_log.id == GENERATED_EVENT_ID
+    assert event_log.event_type == OrderEventType.PAYMENT_SUCCESSFUL
+    assert event_log.from_state == OrderState.PENDING_PAYMENT
+    assert event_log.to_state == OrderState.CONFIRMED
+    assert event_log.metadata == metadata
+    assert committed_order.current_state == OrderState.CONFIRMED
+    assert committed_order.version == 4
+    assert committed_order.updated_at > created_at
+    assert committed_order.history == [event_log]
+    assert result == committed_order
+
+
+def test_apply_event_uses_one_timestamp_for_order_and_event() -> None:
+    service, order_repository = create_service()
+    order = Order(
+        id=ORDER_ID,
+        product_ids=["product-1"],
+        amount=100.0,
+        current_state=OrderState.PENDING_PAYMENT,
+    )
+    order_repository.get_by_id.return_value = order
+
+    service.apply_event(
         order_id=ORDER_ID,
         event_type=OrderEventType.PAYMENT_SUCCESSFUL,
-        metadata=metadata,
     )
 
-    assert result.current_state == OrderState.CONFIRMED
-    assert len(result.history) == 1
-    history_entry = result.history[0]
-    assert history_entry.event_type == OrderEventType.PAYMENT_SUCCESSFUL
-    assert history_entry.from_state == OrderState.PENDING_PAYMENT
-    assert history_entry.to_state == OrderState.CONFIRMED
-    assert history_entry.metadata == metadata
-    assert result.updated_at > created_at
-    order_repository.save.assert_called_once_with(order)
+    committed_order = order_repository.commit_transition.call_args.kwargs["order"]
+    event_log = order_repository.commit_transition.call_args.kwargs["event_log"]
+    assert committed_order.updated_at == event_log.created_at
 
 
 def test_apply_event_uses_defensive_copy_for_history_metadata() -> None:
-    service, order_repository, _ = create_service()
+    service, order_repository = create_service()
     order = Order(
         id=ORDER_ID,
         product_ids=["product-1"],
@@ -142,8 +184,8 @@ def test_apply_event_uses_defensive_copy_for_history_metadata() -> None:
     assert result.history[0].metadata == {"details": {"paymentId": "payment-1"}}
 
 
-def test_invalid_transition_does_not_save_or_mutate_order() -> None:
-    service, order_repository, support_ticket_repository = create_service()
+def test_invalid_transition_does_not_commit_or_mutate_order() -> None:
+    service, order_repository = create_service()
     order = Order(
         id=ORDER_ID,
         product_ids=["product-1"],
@@ -160,13 +202,12 @@ def test_invalid_transition_does_not_save_or_mutate_order() -> None:
             metadata={"carrier": "local"},
         )
 
-    order_repository.save.assert_not_called()
-    support_ticket_repository.save.assert_not_called()
+    order_repository.commit_transition.assert_not_called()
     assert order == original_order
 
 
-def test_apply_event_to_missing_order_does_not_save() -> None:
-    service, order_repository, support_ticket_repository = create_service()
+def test_apply_event_to_missing_order_does_not_commit() -> None:
+    service, order_repository = create_service()
     order_repository.get_by_id.return_value = None
 
     with pytest.raises(OrderNotFoundError):
@@ -175,12 +216,11 @@ def test_apply_event_to_missing_order_does_not_save() -> None:
             event_type=OrderEventType.PAYMENT_SUCCESSFUL,
         )
 
-    order_repository.save.assert_not_called()
-    support_ticket_repository.save.assert_not_called()
+    order_repository.commit_transition.assert_not_called()
 
 
-def test_valid_high_value_payment_failure_creates_support_ticket() -> None:
-    service, order_repository, support_ticket_repository = create_service()
+def test_valid_high_value_payment_failure_creates_support_ticket_in_commit() -> None:
+    service, order_repository = create_service()
     order = Order(
         id=ORDER_ID,
         product_ids=["product-1"],
@@ -190,17 +230,19 @@ def test_valid_high_value_payment_failure_creates_support_ticket() -> None:
     metadata = {"provider": "payment-gateway"}
     order_repository.get_by_id.return_value = order
 
-    with patch("app.services.order_service.uuid.uuid4", return_value=GENERATED_TICKET_ID):
+    with patch(
+        "app.services.order_service.uuid.uuid4",
+        side_effect=[GENERATED_EVENT_ID, GENERATED_TICKET_ID],
+    ):
         service.apply_event(
             order_id=ORDER_ID,
             event_type=OrderEventType.PAYMENT_FAILED,
             metadata=metadata,
         )
 
-    support_ticket_repository.save.assert_called_once()
-    ticket = support_ticket_repository.save.call_args.args[0]
+    ticket = order_repository.commit_transition.call_args.kwargs["support_ticket"]
+    event_log = order_repository.commit_transition.call_args.kwargs["event_log"]
     assert isinstance(ticket, SupportTicket)
-    assert isinstance(ticket.id, UUID)
     assert ticket.id == GENERATED_TICKET_ID
     assert ticket.order_id == ORDER_ID
     assert ticket.reason == "High-value order payment failed"
@@ -208,13 +250,14 @@ def test_valid_high_value_payment_failure_creates_support_ticket() -> None:
         "order_amount": 1000.01,
         "event_metadata": metadata,
     }
+    assert ticket.created_at == event_log.created_at
 
 
 @pytest.mark.parametrize("amount", [1000.0, 999.99])
 def test_payment_failure_for_amount_up_to_1000_does_not_create_ticket(
     amount: float,
 ) -> None:
-    service, order_repository, support_ticket_repository = create_service()
+    service, order_repository = create_service()
     order = Order(
         id=ORDER_ID,
         product_ids=["product-1"],
@@ -229,11 +272,11 @@ def test_payment_failure_for_amount_up_to_1000_does_not_create_ticket(
         metadata={"provider": "payment-gateway"},
     )
 
-    support_ticket_repository.save.assert_not_called()
+    assert order_repository.commit_transition.call_args.kwargs["support_ticket"] is None
 
 
 def test_invalid_payment_failure_does_not_create_support_ticket() -> None:
-    service, order_repository, support_ticket_repository = create_service()
+    service, order_repository = create_service()
     order = Order(
         id=ORDER_ID,
         product_ids=["product-1"],
@@ -248,5 +291,4 @@ def test_invalid_payment_failure_does_not_create_support_ticket() -> None:
             event_type=OrderEventType.PAYMENT_FAILED,
         )
 
-    order_repository.save.assert_not_called()
-    support_ticket_repository.save.assert_not_called()
+    order_repository.commit_transition.assert_not_called()

@@ -1,6 +1,9 @@
+from app.adapters.dynamodb_order_repository import DynamoDBOrderRepository
+from app.adapters.in_memory_store import InMemoryStore
 from app.adapters.in_memory_order_repository import InMemoryOrderRepository
-from app.adapters.in_memory_support_ticket_repository import (
-    InMemorySupportTicketRepository,
-)
 
-__all__ = ["InMemoryOrderRepository", "InMemorySupportTicketRepository"]
+__all__ = [
+    "InMemoryOrderRepository",
+    "InMemoryStore",
+    "DynamoDBOrderRepository",
+]
