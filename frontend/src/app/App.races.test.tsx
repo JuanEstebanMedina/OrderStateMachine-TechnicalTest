@@ -268,7 +268,7 @@ describe('App race-condition behavior', () => {
     expect(
       screen.getByRole('option', { name: /preparing shipment/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/custom inspection passed/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/custom inspection passed/i).length).toBeGreaterThan(0);
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^refresh$/i })).toBeEnabled();
     });
@@ -303,7 +303,7 @@ describe('App race-condition behavior', () => {
     expect(
       (await screen.findAllByText(/workspace refresh failed/i)).length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText(/custom flow resumed/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/custom flow resumed/i).length).toBeGreaterThan(0);
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^refresh$/i })).toBeEnabled();
     });

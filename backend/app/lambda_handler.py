@@ -5,20 +5,22 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
 from mangum import Mangum
 
-from app.main import app
+from app.config import get_api_gateway_base_path
+from app.main import create_app
 
 
 SERVICE_NAME = os.getenv("POWERTOOLS_SERVICE_NAME", "order-state-machine-api")
 METRICS_NAMESPACE = os.getenv("POWERTOOLS_METRICS_NAMESPACE", "OrderStateMachine")
-API_GATEWAY_BASE_PATH = os.getenv("API_GATEWAY_BASE_PATH", "/")
+API_GATEWAY_BASE_PATH = get_api_gateway_base_path()
 
 logger = Logger(service=SERVICE_NAME)
 tracer = Tracer(service=SERVICE_NAME)
 metrics = Metrics(namespace=METRICS_NAMESPACE, service=SERVICE_NAME)
+app = create_app(root_path=API_GATEWAY_BASE_PATH)
 asgi_handler = Mangum(
     app,
     lifespan="off",
-    api_gateway_base_path=API_GATEWAY_BASE_PATH,
+    api_gateway_base_path=API_GATEWAY_BASE_PATH or "/",
 )
 
 

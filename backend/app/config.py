@@ -5,6 +5,7 @@ DEFAULT_CORS_ALLOWED_ORIGINS = ["http://localhost:5173"]
 DEFAULT_PERSISTENCE_BACKEND = "memory"
 DEFAULT_DYNAMODB_TABLE_NAME = "OrderStateMachine"
 DEFAULT_AWS_REGION = "us-east-1"
+DEFAULT_API_GATEWAY_BASE_PATH = ""
 
 
 def get_cors_allowed_origins() -> list[str]:
@@ -49,3 +50,22 @@ def get_aws_region() -> str:
     if not region:
         raise ValueError("AWS_REGION must not be empty")
     return region
+
+
+def normalize_api_gateway_base_path(base_path: str | None) -> str:
+    if base_path is None:
+        return DEFAULT_API_GATEWAY_BASE_PATH
+
+    path_segments = [
+        segment
+        for segment in base_path.strip().split("/")
+        if segment
+    ]
+    if not path_segments:
+        return DEFAULT_API_GATEWAY_BASE_PATH
+
+    return f"/{'/'.join(path_segments)}"
+
+
+def get_api_gateway_base_path() -> str:
+    return normalize_api_gateway_base_path(os.getenv("API_GATEWAY_BASE_PATH"))

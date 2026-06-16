@@ -128,6 +128,14 @@ def run_smoke_test(base_url: str) -> str:
     if health_payload.get("status") != "ok":
         raise SmokeTestFailure("health check did not return status='ok'")
 
+    openapi_response = request_json(base_url, "GET", "/openapi.json")
+    require_status(openapi_response, 200, "retrieve OpenAPI document")
+    openapi_payload = require_object(
+        openapi_response.body,
+        "retrieve OpenAPI document",
+    )
+    require_string(openapi_payload, "openapi", "retrieve OpenAPI document")
+
     create_response = request_json(
         base_url,
         "POST",

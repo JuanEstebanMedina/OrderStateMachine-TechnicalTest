@@ -21,4 +21,10 @@ class OrderRepository(Protocol):
         support_ticket: SupportTicket | None,
         expected_version: int,
     ) -> Order:
+        """Atomically commit an order update, event, and optional ticket.
+
+        `expected_version` is the caller's optimistic-lock version. Stale
+        versions must raise `OrderVersionConflictError`, and implementations
+        must not leave partial writes.
+        """
         ...
