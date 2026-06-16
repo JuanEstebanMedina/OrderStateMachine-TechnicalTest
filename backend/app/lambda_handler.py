@@ -10,11 +10,16 @@ from app.main import app
 
 SERVICE_NAME = os.getenv("POWERTOOLS_SERVICE_NAME", "order-state-machine-api")
 METRICS_NAMESPACE = os.getenv("POWERTOOLS_METRICS_NAMESPACE", "OrderStateMachine")
+API_GATEWAY_BASE_PATH = os.getenv("API_GATEWAY_BASE_PATH", "/")
 
 logger = Logger(service=SERVICE_NAME)
 tracer = Tracer(service=SERVICE_NAME)
 metrics = Metrics(namespace=METRICS_NAMESPACE, service=SERVICE_NAME)
-asgi_handler = Mangum(app, lifespan="off")
+asgi_handler = Mangum(
+    app,
+    lifespan="off",
+    api_gateway_base_path=API_GATEWAY_BASE_PATH,
+)
 
 
 def _safe_api_context(event: dict[str, Any]) -> dict[str, Any]:

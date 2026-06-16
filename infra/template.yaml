@@ -72,6 +72,7 @@ Resources:
       Handler: app.lambda_handler.handler
       Environment:
         Variables:
+          API_GATEWAY_BASE_PATH: !Sub "/${StageName}"
           PERSISTENCE_BACKEND: dynamodb
           DYNAMODB_TABLE_NAME: !Ref OrdersTable
           CORS_ALLOWED_ORIGINS: !Join [",", !Ref FrontendOrigins]
@@ -106,6 +107,12 @@ Resources:
             Path: /{proxy+}
             Method: ANY
             PayloadFormatVersion: "2.0"
+
+  OrderApiFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${OrderApiFunction}"
+      RetentionInDays: 14
 
 Outputs:
   ApiBaseUrl:
