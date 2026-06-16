@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -151,7 +152,9 @@ describe('StateMachineDiagram', () => {
     expect(container.querySelectorAll('[data-kind="historical"]')).toHaveLength(1);
   });
 
-  it('renders the full backend transition inventory inside a disclosure', () => {
+  it('renders the full backend transition inventory inside an expandable disclosure', async () => {
+    const user = userEvent.setup();
+
     render(
       <StateMachineDiagram
         availableEvents={['paymentSuccessful']}
@@ -162,11 +165,50 @@ describe('StateMachineDiagram', () => {
       />,
     );
 
-    const disclosure = screen.getByText(/view all backend transitions/i)
-      .parentElement;
+    const summary = screen.getByText(/view all backend transitions/i);
+    const disclosure = summary.parentElement;
     expect(disclosure).not.toBeNull();
+    expect(disclosure).not.toHaveAttribute('open');
+
+    await user.click(summary);
+
+    expect(disclosure).toHaveAttribute('open');
     expect(
-      within(disclosure as HTMLElement).getByText(/pending biometrical verification/i),
+      within(disclosure as HTMLElement).getAllByText(
+        /pending biometrical verification/i,
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('represents every backend transition in the mobile inventory', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <StateMachineDiagram
+        availableEvents={['paymentSuccessful']}
+        definition={stateMachineDefinition}
+        error={null}
+        isLoading={false}
+        order={baseDetail}
+      />,
+    );
+
+    await user.click(screen.getByText(/view all backend transitions/i));
+
+    const mobileInventory = screen.getByRole('list', {
+      name: /all backend transitions/i,
+    });
+    const mobileTransitions = within(mobileInventory).getAllByRole('listitem');
+
+    expect(mobileTransitions).toHaveLength(stateMachineDefinition.transitions.length);
+    expect(within(mobileTransitions[0]).getByText('From')).toBeInTheDocument();
+    expect(within(mobileTransitions[0]).getByText('Event')).toBeInTheDocument();
+    expect(within(mobileTransitions[0]).getByText('To')).toBeInTheDocument();
+    expect(
+      within(mobileTransitions[0]).getByText(/pending payment/i),
+    ).toBeInTheDocument();
+    expect(
+      within(mobileTransitions[0]).getByText(/no verification needed/i),
     ).toBeInTheDocument();
   });
 
