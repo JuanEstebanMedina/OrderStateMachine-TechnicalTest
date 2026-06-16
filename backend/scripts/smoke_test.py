@@ -12,6 +12,9 @@ from uuid import uuid4
 SMOKE_EVENT = "noVerificationNeeded"
 EXPECTED_INITIAL_STATE = "Pending"
 EXPECTED_STATE_AFTER_SMOKE_EVENT = "PendingPayment"
+CREATE_ORDER_STEP = "create order"
+RETRIEVE_CREATED_ORDER_STEP = "retrieve created order"
+RETRIEVE_UPDATED_ORDER_STEP = "retrieve updated order"
 
 
 class SmokeTestFailure(Exception):
@@ -134,21 +137,25 @@ def run_smoke_test(base_url: str) -> str:
             "amount": 42.5,
         },
     )
-    require_status(create_response, 201, "create order")
-    created_order = require_object(create_response.body, "create order")
-    order_id = require_string(created_order, "orderId", "create order")
+    require_status(create_response, 201, CREATE_ORDER_STEP)
+    created_order = require_object(create_response.body, CREATE_ORDER_STEP)
+    order_id = require_string(created_order, "orderId", CREATE_ORDER_STEP)
     assert_order_state(created_order, EXPECTED_INITIAL_STATE, "created order")
 
     get_created_response = request_json(base_url, "GET", f"/orders/{order_id}")
-    require_status(get_created_response, 200, "retrieve created order")
+    require_status(get_created_response, 200, RETRIEVE_CREATED_ORDER_STEP)
     retrieved_order = require_object(
         get_created_response.body,
-        "retrieve created order",
+        RETRIEVE_CREATED_ORDER_STEP,
     )
     if retrieved_order.get("orderId") != order_id:
         raise SmokeTestFailure("retrieved order ID did not match created order")
     assert_order_state(retrieved_order, EXPECTED_INITIAL_STATE, "retrieved order")
-    initial_history = require_list(retrieved_order, "history", "retrieve created order")
+    initial_history = require_list(
+        retrieved_order,
+        "history",
+        RETRIEVE_CREATED_ORDER_STEP,
+    )
     if initial_history:
         raise SmokeTestFailure("new order unexpectedly has transition history")
 
@@ -179,14 +186,17 @@ def run_smoke_test(base_url: str) -> str:
     )
 
     get_updated_response = request_json(base_url, "GET", f"/orders/{order_id}")
-    require_status(get_updated_response, 200, "retrieve updated order")
-    persisted_order = require_object(get_updated_response.body, "retrieve updated order")
+    require_status(get_updated_response, 200, RETRIEVE_UPDATED_ORDER_STEP)
+    persisted_order = require_object(
+        get_updated_response.body,
+        RETRIEVE_UPDATED_ORDER_STEP,
+    )
     assert_order_state(
         persisted_order,
         EXPECTED_STATE_AFTER_SMOKE_EVENT,
         "persisted order",
     )
-    history = require_list(persisted_order, "history", "retrieve updated order")
+    history = require_list(persisted_order, "history", RETRIEVE_UPDATED_ORDER_STEP)
     if len(history) != 1:
         raise SmokeTestFailure(f"persisted order history length is {len(history)}; expected 1")
 
