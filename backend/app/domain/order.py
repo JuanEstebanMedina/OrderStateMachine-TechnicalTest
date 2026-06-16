@@ -13,11 +13,22 @@ def utc_now() -> datetime:
 
 @dataclass
 class OrderEventLog:
+    id: UUID
     event_type: OrderEventType
     from_state: OrderState
     to_state: OrderState
     metadata: dict[str, Any]
     created_at: datetime = field(default_factory=utc_now)
+
+
+@dataclass(frozen=True)
+class OrderSummary:
+    id: UUID
+    product_ids: list[str]
+    amount: float
+    current_state: OrderState
+    created_at: datetime
+    updated_at: datetime
 
 
 @dataclass
@@ -29,3 +40,4 @@ class Order:
     history: list[OrderEventLog] = field(default_factory=list)
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
+    version: int = 0

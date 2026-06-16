@@ -1,7 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID
 
-from app.adapters import InMemoryOrderRepository, InMemorySupportTicketRepository
+from app.adapters import InMemoryOrderRepository
 from app.domain import Order, OrderEventType, OrderState
 from app.services import OrderService, OrderStateMachine
 
@@ -10,7 +10,6 @@ def test_processes_events_for_different_orders_concurrently() -> None:
     order_repository = InMemoryOrderRepository()
     service = OrderService(
         order_repository=order_repository,
-        support_ticket_repository=InMemorySupportTicketRepository(),
         state_machine=OrderStateMachine(),
     )
     orders = [
@@ -30,7 +29,7 @@ def test_processes_events_for_different_orders_concurrently() -> None:
         for future in futures:
             future.result(timeout=5)
 
-    assert len(order_repository.list_all()) == len(orders)
+    assert len(order_repository.list_summaries()) == len(orders)
 
     for index, order in enumerate(orders):
         stored_order = order_repository.get_by_id(order.id)
@@ -57,11 +56,11 @@ def test_saves_distinct_orders_concurrently() -> None:
     ]
 
     with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = [executor.submit(repository.save, order) for order in orders]
+        futures = [executor.submit(repository.create, order) for order in orders]
         for future in futures:
             future.result(timeout=5)
 
-    stored_orders = repository.list_all()
+    stored_orders = repository.list_summaries()
 
     assert len(stored_orders) == len(orders)
     assert {order.id for order in stored_orders} == {order.id for order in orders}
