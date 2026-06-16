@@ -1,174 +1,125 @@
 # Order State Machine
 
-Technical challenge project for implementing an order state machine with a Python FastAPI REST API and a React frontend.
+Order State Machine is a technical challenge project for creating, inspecting,
+and advancing orders through backend-approved state transitions. It includes a
+FastAPI backend, a React/Vite operations UI, local and DynamoDB persistence
+adapters, and an AWS SAM deployment path for the backend.
 
-## Project structure
+## Live Demo
 
-- `backend`: Python REST API
-- `frontend`: React frontend
+Frontend:
+
+```text
+https://order-state-machine-technical-test.vercel.app
+```
+
+API documentation is available at `<ApiBaseUrl>/docs` while the AWS stack is
+deployed. The API Gateway URL is intentionally not committed to this repository.
+
+## Screenshots
+
+<img src="docs/images/dashboard-overview.png" alt="Desktop dashboard showing order summary cards, create-order form, order lookup, and order list." width="900">
+
+<img src="docs/images/order-detail.png" alt="Desktop order detail workspace showing order identity, terminal state, and transition history." width="900">
+
+<img src="docs/images/mobile-dashboard.png" alt="Mobile dashboard showing responsive filters and order cards." width="360">
+
+## Requirements Coverage
+
+| Requirement | Implementation |
+| --- | --- |
+| Create an order with product IDs and amount | `POST /orders` validates product IDs, removes duplicates, and requires a finite positive amount. |
+| Inspect the current state | Order detail and summary responses expose `currentState`. |
+| Apply only valid transitions | `OrderStateMachine` owns the transition table used by the service and the API. |
+| Reject invalid transitions | Invalid state/event pairs raise a domain error and return HTTP 409. |
+| Event-specific business behavior | Event application records history and moves the order to the next allowed state. |
+| High-value `paymentFailed` support-review ticket | High-value payment failures create a support ticket in the repository transaction. |
+| Repository pattern for external persistence | Services depend on `OrderRepository`, not concrete storage adapters. |
+| Service/router/repository separation | FastAPI routers call services; services call repository ports and domain logic. |
+| Event history | Transition history is stored as separate event entries and returned in order detail. |
+| In-memory persistence option | `PERSISTENCE_BACKEND=memory` uses the in-memory adapter for local tests and simple runs. |
+| DynamoDB persistence option | `PERSISTENCE_BACKEND=dynamodb` uses the one-table DynamoDB adapter. |
+| State-machine visualization | The frontend renders backend-provided states and transitions, including a responsive inventory. |
+| Serverless AWS deployment bonus | SAM deploys API Gateway HTTP API, Lambda/FastAPI/Mangum, and DynamoDB. |
+| Lambda Powertools observability bonus | Lambda uses Powertools Logger, Tracer, Metrics, and cold-start metrics. |
 
 ## Architecture
 
-The backend uses a simple layered architecture with hexagonal inspiration:
+```mermaid
+flowchart LR
+    Browser[Browser]
+    Frontend[Vercel / React]
+    Api[API Gateway HTTP API]
+    Lambda[Lambda / FastAPI / Mangum]
+    Dynamo[DynamoDB]
+    Observability[CloudWatch / X-Ray]
 
-```text
-API routes
--> OrderService
--> OrderStateMachine and repository ports
--> in-memory adapters
+    Browser --> Frontend
+    Frontend --> Api
+    Api --> Lambda
+    Lambda --> Dynamo
+    Lambda --> Observability
 ```
 
-Pydantic schemas are HTTP request and response DTOs. Domain models remain independent from FastAPI and Pydantic. Concrete adapters are selected in `app/dependencies.py`, so business logic depends on repository ports rather than infrastructure implementations.
+Local development can also run the backend directly with Uvicorn and either
+in-memory storage or DynamoDB Local.
 
-Order creation requests are normalized by the API: product IDs are trimmed,
-empty IDs are rejected, duplicates are removed while preserving order, and the
-amount must be a finite number greater than zero. Invalid create payloads return
-HTTP 422.
+## Key Design Decisions
 
-## Persistence
+- The backend is the source of truth for valid transitions; the frontend only
+  renders state-machine metadata returned by the API.
+- DynamoDB transitions use one atomic transaction for the order update, event
+  item, and optional support ticket.
+- `Order.version` provides optimistic locking. Stale writes become
+  `OrderVersionConflictError` and are mapped to HTTP 409 where appropriate.
+- Repository ports keep service logic independent from in-memory and DynamoDB
+  persistence details.
+- DynamoDB uses one table with `PK`, `SK`, `GSI1PK`, and `GSI1SK`.
+- `GET /orders` uses `GSI1`; the index is eventually consistent.
+- Individual order base-table reads use `ConsistentRead=True`.
+- In-memory transition mutation is protected with per-order locking.
+- `ClientRequestToken=str(event_log.id)` protects identical retries of one
+  constructed repository operation, but it is not HTTP-level idempotency.
+- Lambda serves FastAPI through Mangum and uses the API Gateway stage prefix as
+  FastAPI `root_path` so `/docs` resolves `<ApiBaseUrl>/openapi.json` correctly.
+- The deployed Lambda role is generated by SAM and scoped to the DynamoDB
+  operations the application uses.
 
-The API supports two persistence modes:
+## Technology Stack
 
-```text
-PERSISTENCE_BACKEND=memory
-PERSISTENCE_BACKEND=dynamodb
-```
+- Backend: Python 3.14, FastAPI, Pydantic, boto3, Mangum
+- Persistence: in-memory adapter, DynamoDB, DynamoDB Local
+- Observability: AWS Lambda Powertools, CloudWatch, X-Ray
+- Frontend: React, TypeScript, Vite, Vitest, Testing Library
+- Infrastructure: AWS SAM, API Gateway HTTP API, Lambda, DynamoDB
+- Tooling: Pyright, pytest, Docker Compose, ESLint
 
-`memory` is the safe default and is used by unit/API tests. `dynamodb` uses one
-DynamoDB table through boto3. Domain objects, services, routers, and HTTP
-schemas do not contain DynamoDB keys, expressions, table names, or AWS errors.
+## Local Quick Start
 
-Order transitions are committed atomically through one explicit repository
-operation. The service loads the order, captures the expected version, asks the
-state machine for the next state, builds one event log, optionally builds a
-support ticket, and calls `commit_transition(...)`. Successful transitions
-increment `Order.version` exactly once. Stale same-order changes raise
-`OrderVersionConflictError`, which FastAPI maps to HTTP 409 Conflict.
-
-The in-memory adapter uses per-order locks for transition mutation plus a small
-registry lock for shared dictionaries. Different order IDs may transition
-independently, while two stale updates to the same order allow exactly one
-successful commit.
-
-### DynamoDB layout
-
-The DynamoDB adapter uses one table:
-
-```text
-Partition key: PK
-Sort key: SK
-GSI1 partition key: GSI1PK
-GSI1 sort key: GSI1SK
-```
-
-Order item:
-
-```text
-PK = ORDER#<orderId>
-SK = ORDER
-entityType = ORDER
-GSI1PK = ORDERS
-GSI1SK = <createdAt>#<orderId>
-```
-
-Event item:
-
-```text
-PK = ORDER#<orderId>
-SK = EVENT#<createdAt>#<eventId>
-entityType = ORDER_EVENT
-```
-
-Support ticket item:
-
-```text
-PK = ORDER#<orderId>
-SK = TICKET#<ticketId>
-entityType = SUPPORT_TICKET
-```
-
-`GET /orders` queries `GSI1`; it does not use `Scan`. The GSI is eventually
-consistent, so tests that need immediate summary visibility use bounded polling.
-For this technical test, a single `GSI1PK=ORDERS` partition is acceptable. A
-high-scale production system would likely shard or bucket that index partition.
-
-Order detail reads use `ConsistentRead=True` for each base-table operation: one
-`GetItem` for the order item and one `Query` for event items. The assembled
-detail response is not a multi-operation transactional snapshot; it is a
-practical read model for this technical test. Event history is reconstructed
-from separate event items sorted by their sort keys.
-
-Each transition uses exactly one DynamoDB `TransactWriteItems` request:
-
-- `Update` the order item with conditions on `version` and `currentState`.
-- `Put` the event item with key non-existence protection.
-- Optionally `Put` the support-ticket item with key non-existence protection.
-
-The transaction uses `ClientRequestToken=str(event_log.id)`. This protects
-identical retries of the already-constructed repository operation. It is not
-complete HTTP idempotency because a separate API invocation creates a new event
-UUID. Stable client idempotency keys or Lambda Powertools are later-phase work.
-
-AWS transaction cancellation reasons are translated to business HTTP 409 only
-when the order update condition fails. Transaction conflicts, throttling,
-validation errors, credential errors, endpoint errors, and missing-table errors
-remain infrastructure failures.
-
-## Running the backend
+Backend:
 
 ```bash
 cd backend
 python -m venv .venv
 ```
 
-Activate the environment:
+PowerShell:
 
-```bash
-# Windows PowerShell
+```powershell
 .\.venv\Scripts\Activate.ps1
-
-# Unix-like shells
-source .venv/bin/activate
-```
-
-Install dependencies and run the API:
-
-```bash
 python -m pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Local frontend CORS is enabled by default for:
+Unix-like shells:
 
-```text
-CORS_ALLOWED_ORIGINS=http://localhost:5173
+```bash
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+uvicorn app.main:app --reload
 ```
 
-Use a comma-separated list when more origins are needed:
-
-```text
-CORS_ALLOWED_ORIGINS=http://localhost:5173,https://your-app.vercel.app
-```
-
-The deployed Vercel origin must be added to `CORS_ALLOWED_ORIGINS` before the
-hosted frontend can call the API.
-
-Persistence environment variables:
-
-```text
-PERSISTENCE_BACKEND=memory
-DYNAMODB_TABLE_NAME=OrderStateMachineLocal
-DYNAMODB_ENDPOINT_URL=http://localhost:8001
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=local
-AWS_SECRET_ACCESS_KEY=local
-```
-
-Set `PERSISTENCE_BACKEND=dynamodb` to use DynamoDB. `DYNAMODB_ENDPOINT_URL` is
-optional for real AWS. The local credentials above are non-secret values for
-DynamoDB Local.
-
-## Running the frontend
+Frontend:
 
 ```bash
 cd frontend
@@ -176,35 +127,24 @@ npm install
 npm run dev
 ```
 
-Create a local `.env` file from `frontend/.env.example` when needed:
+The frontend reads:
 
 ```text
 VITE_API_BASE_URL=http://localhost:8000
 ```
 
-Do not configure a Vite proxy. The frontend calls the configured API URL
-directly, and FastAPI CORS controls allowed browser origins.
+from `frontend/.env` when present. Use `frontend/.env.example` as the template.
 
-The dashboard starts in an overview mode with summary cards, create-order
-controls, a full UUID lookup form, and responsive order cards. Selecting an
-order opens a workspace view with order identity, event application, history,
-and a contextual state-machine diagram. The diagram uses backend transition
-metadata for edges; the default view shows only visited and currently available
-transitions, while the full transition inventory remains available in a
-disclosure.
+Backend local defaults are documented in `backend/.env.example`. For DynamoDB
+Local, fake local AWS credentials are enough; do not use real AWS keys in local
+`.env` files.
 
-## Docker Compose local stack
+## Docker Compose Stack
 
-The development stack starts DynamoDB Local, creates the table, runs the FastAPI
-backend in DynamoDB mode, and runs the Vite frontend:
+The Compose stack starts DynamoDB Local, creates the table, runs the backend in
+DynamoDB mode, and starts the frontend:
 
 ```bash
-docker compose up --build
-```
-
-PowerShell:
-
-```powershell
 docker compose up --build
 ```
 
@@ -214,84 +154,134 @@ Services:
 - Backend: `http://localhost:8000`
 - Frontend: `http://localhost:5173`
 
-The `dynamodb-init` service is one-shot and runs the idempotent table creation
-script. It waits for the table and treats an existing table as success. Table
-creation is not performed during FastAPI startup.
-
-## Validation
+Stop the stack:
 
 ```bash
-cd backend
-python -m pytest tests -m "not integration"
+docker compose down
 ```
 
-PowerShell:
+## AWS SAM Deployment
+
+SAM deploys only the backend and DynamoDB infrastructure. The frontend remains
+hosted separately, such as on Vercel.
+
+Required local tools:
+
+- AWS CLI v2
+- AWS SAM CLI
+- Docker
+
+Run SAM commands from `infra`, where `template.yaml` and `samconfig.toml` are
+colocated. SAM builds in a container because Lambda runs on Linux and the
+project includes native Python dependencies.
+
+Validate credentials:
 
 ```powershell
-cd backend
-python -m pytest tests -m "not integration"
+aws sts get-caller-identity --profile <profile>
+aws configure get region --profile <profile>
 ```
 
-DynamoDB Local integration tests are opt-in:
+Stop before deployment if the STS identity ARN ends in `:root`.
+
+Validate and build:
+
+```powershell
+cd infra
+sam validate --lint
+sam build
+```
+
+First deployment:
+
+```powershell
+cd infra
+sam build
+sam deploy --guided --profile <profile>
+```
+
+Subsequent deployments:
+
+```powershell
+cd infra
+sam build
+sam deploy --profile <profile>
+```
+
+Configure `FrontendOrigins` with exact origins only, for example:
+
+```text
+http://localhost:5173,https://your-project.vercel.app
+```
+
+The value configures both API Gateway CORS and the backend
+`CORS_ALLOWED_ORIGINS` environment variable. Do not use wildcard CORS with this
+application.
+
+Post-deployment smoke test:
+
+```bash
+python backend/scripts/smoke_test.py --base-url <ApiBaseUrl>
+```
+
+## Testing And Coverage
+
+Static analysis:
+
+```bash
+npx --yes pyright --project pyrightconfig.json
+```
+
+Backend unit tests:
 
 ```bash
 cd backend
-RUN_DYNAMODB_INTEGRATION=1 python -m pytest tests -m integration
+python -m pytest tests -m "not integration"
+cd ..
 ```
 
-PowerShell:
+DynamoDB Local integration tests:
+
+```bash
+docker compose up -d dynamodb-local
+cd backend
+RUN_DYNAMODB_INTEGRATION=1 python -m pytest tests -m integration
+cd ..
+docker compose down
+```
+
+PowerShell integration-test environment variable:
 
 ```powershell
 cd backend
 $env:RUN_DYNAMODB_INTEGRATION = "1"
 python -m pytest tests -m integration
 Remove-Item Env:RUN_DYNAMODB_INTEGRATION
+cd ..
 ```
+
+Backend coverage:
+
+```bash
+cd backend
+python -m pytest tests -m "not integration" --cov=app --cov-branch --cov-report=term-missing
+cd ..
+```
+
+Frontend validation:
 
 ```bash
 cd frontend
 npm run lint
 npm run build
 npm run test:run
-```
-
-## Code coverage
-
-Stable backend coverage excludes opt-in DynamoDB Local integration tests:
-
-```bash
-cd backend
-python -m pytest tests -m "not integration" --cov=app --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml
-```
-
-PowerShell:
-
-```powershell
-cd backend
-python -m pytest tests -m "not integration" --cov=app --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml
-```
-
-Frontend coverage:
-
-```bash
-cd frontend
 npm run test:coverage
+cd ..
 ```
 
-Backend XML is written to `backend/coverage.xml`. Frontend LCOV is written to
-`frontend/coverage/lcov.info`. Generated reports are ignored by Git. DynamoDB
-Local integration tests remain opt-in and may be included in a separate full
-local backend coverage run.
+Generated coverage output is ignored by Git.
 
-## API documentation
-
-When the backend is running, OpenAPI documentation is available at:
-
-```text
-http://localhost:8000/docs
-```
-
-## Endpoints
+## API Endpoints
 
 - `GET /health`
 - `POST /orders`
@@ -300,10 +290,8 @@ http://localhost:8000/docs
 - `GET /orders/{order_id}/available-events`
 - `POST /orders/{order_id}/events`
 - `GET /state-machine`
-
-`GET /orders` returns summaries without `history`. `POST /orders`,
-`GET /orders/{order_id}`, and `POST /orders/{order_id}/events` return detailed
-orders with complete `history`.
+- `GET /docs`
+- `GET /openapi.json`
 
 Create an order:
 
@@ -325,121 +313,29 @@ Apply an event:
 }
 ```
 
-## In-memory storage and concurrency
+## Known Limitations
 
-Storage in memory mode is lost when the Python process stops. Repository access is protected for concurrent requests within one process, which supports multiple different order IDs being processed concurrently by FastAPI worker threads.
+- The public demo API has no authentication.
+- `GET /orders` uses a DynamoDB GSI and is eventually consistent.
+- Lambda and API Gateway may experience cold starts.
+- `GSI1PK=ORDERS` is acceptable for the challenge, but high scale would require
+  sharding or bucketing.
+- HTTP-level client idempotency keys are not implemented.
+- Assembled order detail reads are not a multi-operation transactional snapshot.
+- The deployed AWS stack may be removed after evaluation to avoid retaining
+  cloud resources.
 
-Each application worker has independent memory. DynamoDB mode persists orders,
-events, and support tickets across backend restarts. DynamoDB Local is useful
-for development and integration testing, but it is not a production deployment
-target and does not model every AWS operational characteristic.
+## Teardown
 
-Frontend hosting, custom domains, WAF, Cognito, VPC resources, and production
-container deployment are intentionally outside this phase.
-
-## AWS SAM deployment
-
-The backend can be deployed to AWS with SAM using this architecture:
-
-```text
-Frontend -> API Gateway HTTP API -> Lambda/FastAPI/Mangum -> DynamoDB
-```
-
-Resources:
-
-- API Gateway HTTP API receives browser and API client requests, applies CORS,
-  and forwards every route to the Lambda function.
-- Lambda runs the existing FastAPI app through Mangum. The local Uvicorn entry
-  point remains available for development.
-- DynamoDB stores orders, event history, and support tickets using the same
-  one-table layout used by the local DynamoDB adapter.
-
-IAM is required because the Lambda function must read and write the DynamoDB
-table. SAM generates the Lambda execution role, and the template attaches one
-inline policy scoped to the generated table and `GSI1` index. The policy allows
-only `GetItem`, `PutItem`, `UpdateItem`, `Query`, and `TransactWriteItems`.
-
-Lambda Powertools is configured in the handler for structured context logging,
-X-Ray tracing, automatic metric flushing, and cold-start metrics. The handler
-does not log full API Gateway events by default.
-
-Never commit credentials, temporary AWS Academy tokens, SAM build artifacts, or
-local `.env` files. AWS Academy credentials may be temporary and may need to be
-renewed before deployment.
-
-Required local tools:
-
-- AWS CLI v2
-- AWS SAM CLI
-- Docker
-
-Run SAM commands from the `infra` directory, where `template.yaml` and
-`samconfig.toml` are colocated. SAM is configured to build in a container
-because Lambda runs on Linux and the project contains native Python
-dependencies that must be packaged for the Lambda runtime environment.
-
-Validate and build:
-
-```powershell
-cd infra
-sam validate --lint
-sam build
-```
-
-Verify credentials before deploying:
-
-```powershell
-aws sts get-caller-identity --profile <profile>
-aws configure get region --profile <profile>
-```
-
-Stop before deployment if the identity ARN returned by STS ends in `:root`;
-deployment should use an IAM user or role, not the account root identity.
-
-First deployment, using the built SAM artifact created by `sam build`:
-
-```powershell
-cd infra
-sam build
-sam deploy --guided --profile <profile>
-```
-
-Set `FrontendOrigins` during guided deployment to the hosted frontend origin,
-for example:
-
-```text
-http://localhost:5173,https://your-project.vercel.app
-```
-
-`FrontendOrigins` must contain exact origins only. Do not use wildcard CORS.
-The SAM parameter configures both API Gateway CORS and the Lambda
-`CORS_ALLOWED_ORIGINS` environment variable. The Lambda runtime supplies
-`AWS_REGION`; the template passes `PERSISTENCE_BACKEND=dynamodb`, the generated
-table name, and the joined CORS origins to the backend.
-
-Subsequent deployments:
-
-```powershell
-cd infra
-sam build
-sam deploy --profile <profile>
-```
-
-Post-deployment smoke test:
-
-```bash
-python backend/scripts/smoke_test.py --base-url <ApiBaseUrl>
-```
-
-Teardown:
+Delete the SAM stack when it is no longer needed:
 
 ```powershell
 cd infra
 sam delete --profile <profile>
 ```
 
-## Vercel frontend deployment
+Remove local containers:
 
-Vercel is the intended frontend deployment target. Set
-`VITE_API_BASE_URL` to the API Gateway URL when the backend is deployed, and add
-the final Vercel origin to backend `CORS_ALLOWED_ORIGINS`.
+```bash
+docker compose down
+```
