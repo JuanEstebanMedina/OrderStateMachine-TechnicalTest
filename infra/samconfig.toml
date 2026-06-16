@@ -1,0 +1,18 @@
+version = 0.1
+
+[default.build.parameters]
+use_container = true
+
+[default.global.parameters]
+stack_name = "order-state-machine-serverless"
+region = "us-east-1"
+
+[default.deploy.parameters]
+resolve_s3 = true
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+s3_prefix = "order-state-machine-serverless"
+region = "us-east-1"
+profile = "sam-deployer"
+parameter_overrides = "StageName=\"prod\" FrontendOrigins=\"https://order-state-machine-technical-test.vercel.app\""
+image_repositories = []
