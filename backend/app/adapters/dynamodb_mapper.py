@@ -106,7 +106,9 @@ def restore_domain_numbers(value: Any) -> Any:
         return [restore_domain_numbers(item) for item in value]
 
     if isinstance(value, Decimal):
-        if value.as_tuple().exponent >= 0:
+        exponent = value.as_tuple().exponent
+
+        if isinstance(exponent, int) and exponent >= 0:
             return int(value)
         return float(value)
 

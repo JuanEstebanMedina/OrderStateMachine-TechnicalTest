@@ -29,6 +29,9 @@ from app.domain import (
 from app.ports import OrderRepository
 
 
+ITEM_KEY_NOT_EXISTS_CONDITION = "attribute_not_exists(PK) AND attribute_not_exists(SK)"
+
+
 class DynamoDBOrderRepository(OrderRepository):
     def __init__(
         self,
@@ -43,9 +46,7 @@ class DynamoDBOrderRepository(OrderRepository):
             self._client.put_item(
                 TableName=self._table_name,
                 Item=serialize_item(order_to_item(order)),
-                ConditionExpression=(
-                    "attribute_not_exists(PK) AND attribute_not_exists(SK)"
-                ),
+                ConditionExpression=ITEM_KEY_NOT_EXISTS_CONDITION,
             )
         except self._client.exceptions.ConditionalCheckFailedException as error:
             raise ValueError(f"Order {order.id} already exists") from error
@@ -120,9 +121,7 @@ class DynamoDBOrderRepository(OrderRepository):
                 "Put": {
                     "TableName": self._table_name,
                     "Item": serialize_item(event_log_to_item(order.id, event_log)),
-                    "ConditionExpression": (
-                        "attribute_not_exists(PK) AND attribute_not_exists(SK)"
-                    ),
+                    "ConditionExpression": ITEM_KEY_NOT_EXISTS_CONDITION,
                 }
             },
         ]
@@ -133,9 +132,7 @@ class DynamoDBOrderRepository(OrderRepository):
                     "Put": {
                         "TableName": self._table_name,
                         "Item": serialize_item(support_ticket_to_item(support_ticket)),
-                        "ConditionExpression": (
-                            "attribute_not_exists(PK) AND attribute_not_exists(SK)"
-                        ),
+                        "ConditionExpression": ITEM_KEY_NOT_EXISTS_CONDITION,
                     }
                 }
             )

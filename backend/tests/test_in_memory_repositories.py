@@ -240,11 +240,11 @@ def test_different_orders_can_transition_concurrently() -> None:
         for future in futures:
             future.result(timeout=5)
 
-    assert all(
-        order_repository.get_by_id(order.id).version == 1
-        for order in orders
-        if order_repository.get_by_id(order.id) is not None
-    )
+    for order in orders:
+        stored_order = order_repository.get_by_id(order.id)
+
+        assert stored_order is not None
+        assert stored_order.version == 1
 
 
 def test_two_stale_updates_to_same_order_allow_exactly_one_success() -> None:

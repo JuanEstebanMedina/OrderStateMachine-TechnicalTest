@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
@@ -26,15 +27,15 @@ UPDATED_AT = datetime(2026, 6, 13, 12, 5, 6, tzinfo=timezone.utc)
 
 
 class FakeDynamoDBClient:
-    class exceptions:
-        ConditionalCheckFailedException = ClientError
-        TransactionCanceledException = ClientError
-
     def __init__(
         self,
         error: ClientError | None = None,
         query_responses: list[dict[str, Any]] | None = None,
     ) -> None:
+        self.exceptions = SimpleNamespace(
+            ConditionalCheckFailedException=ClientError,
+            TransactionCanceledException=ClientError,
+        )
         self.error = error
         self.query_responses = query_responses or []
         self.query_calls: list[dict[str, Any]] = []

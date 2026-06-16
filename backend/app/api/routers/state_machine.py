@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from app.dependencies import StateMachineDependency
 from app.domain import OrderState
-from app.schemas import StateMachineDefinitionResponse
+from app.schemas import StateMachineDefinitionResponse, StateMachineTransitionResponse
 
 
 router = APIRouter(tags=["state-machine"])
@@ -13,7 +13,10 @@ def get_state_machine_definition(
     state_machine: StateMachineDependency,
 ) -> StateMachineDefinitionResponse:
     return StateMachineDefinitionResponse(
-        initial_state=OrderState.PENDING,
+        initialState=OrderState.PENDING,
         states=list(OrderState),
-        transitions=state_machine.get_transition_definitions(),
+        transitions=[
+            StateMachineTransitionResponse.model_validate(transition)
+            for transition in state_machine.get_transition_definitions()
+        ],
     )

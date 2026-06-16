@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import os
 import time
+from typing import Any
 from uuid import UUID, uuid4
 
 import boto3
@@ -40,11 +42,11 @@ pytestmark = [
 
 @dataclass(frozen=True)
 class DynamoContext:
-    client: object
+    client: Any
     table_name: str
 
 
-def create_client():
+def create_client() -> Any:
     return boto3.client(
         "dynamodb",
         region_name=os.getenv("AWS_REGION", "us-east-1"),
@@ -60,7 +62,7 @@ def create_table(client, table_name: str) -> None:
 
 
 @pytest.fixture
-def dynamodb_context() -> DynamoContext:
+def dynamodb_context() -> Iterator[DynamoContext]:
     client = create_client()
     table_name = f"OrderStateMachineTest-{uuid4()}"
     create_table(client, table_name)
@@ -242,4 +244,8 @@ def test_independent_transitions_for_different_orders(
         for future in [executor.submit(commit, order) for order in orders]:
             future.result(timeout=5)
 
-    assert all(order_repository.get_by_id(order.id).version == 1 for order in orders)
+    for order in orders:
+        stored_order = order_repository.get_by_id(order.id)
+
+        assert stored_order is not None
+        assert stored_order.version == 1
