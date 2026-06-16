@@ -334,8 +334,87 @@ events, and support tickets across backend restarts. DynamoDB Local is useful
 for development and integration testing, but it is not a production deployment
 target and does not model every AWS operational characteristic.
 
-Lambda, SAM, API Gateway, Mangum, Lambda Powertools, S3, CloudFront, and
-production container deployment are intentionally outside this phase.
+Frontend hosting, custom domains, WAF, Cognito, VPC resources, and production
+container deployment are intentionally outside this phase.
+
+## AWS SAM deployment
+
+The backend can be deployed to AWS with SAM using this architecture:
+
+```text
+Frontend -> API Gateway HTTP API -> Lambda/FastAPI/Mangum -> DynamoDB
+```
+
+Resources:
+
+- API Gateway HTTP API receives browser and API client requests, applies CORS,
+  and forwards every route to the Lambda function.
+- Lambda runs the existing FastAPI app through Mangum. The local Uvicorn entry
+  point remains available for development.
+- DynamoDB stores orders, event history, and support tickets using the same
+  one-table layout used by the local DynamoDB adapter.
+
+IAM is required because the Lambda function must read and write the DynamoDB
+table. SAM generates the Lambda execution role, and the template attaches one
+inline policy scoped to the generated table and `GSI1` index. The policy allows
+only `GetItem`, `PutItem`, `UpdateItem`, `Query`, and `TransactWriteItems`.
+
+Lambda Powertools is configured in the handler for structured context logging,
+X-Ray tracing, automatic metric flushing, and cold-start metrics. The handler
+does not log full API Gateway events by default.
+
+Never commit credentials, temporary AWS Academy tokens, SAM build artifacts, or
+local `.env` files. AWS Academy credentials may be temporary and may need to be
+renewed before deployment.
+
+Required local tools:
+
+- AWS CLI v2
+- AWS SAM CLI
+- Docker
+
+Validate and build the SAM template from the repository root:
+
+```bash
+sam validate --lint --template-file infra/template.yaml
+sam build --template-file infra/template.yaml
+```
+
+Verify credentials before deploying:
+
+```bash
+aws sts get-caller-identity --profile <profile>
+```
+
+First deployment:
+
+```bash
+sam deploy --guided --template-file infra/template.yaml --profile <profile>
+```
+
+Set `FrontendOrigins` during guided deployment to the hosted frontend origin,
+for example the Vercel URL. The Lambda runtime supplies `AWS_REGION`; the
+template passes `PERSISTENCE_BACKEND=dynamodb`, the generated table name, and
+the joined CORS origins to the backend.
+
+Subsequent deployments:
+
+```bash
+sam build --template-file infra/template.yaml
+sam deploy --profile <profile>
+```
+
+Post-deployment smoke test:
+
+```bash
+python backend/scripts/smoke_test.py --base-url <ApiBaseUrl>
+```
+
+Teardown:
+
+```bash
+sam delete --profile <profile>
+```
 
 ## Vercel frontend deployment
 

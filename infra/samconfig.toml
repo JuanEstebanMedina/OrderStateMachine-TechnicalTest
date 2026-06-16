@@ -1,0 +1,9 @@
+version = 0.1
+
+[default.global.parameters]
+stack_name = "order-state-machine-serverless"
+
+[default.deploy.parameters]
+resolve_s3 = true
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"

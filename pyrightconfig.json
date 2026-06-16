@@ -4,9 +4,10 @@
     "backend/tests"
   ],
   "exclude": [
-    "backend/.venv",
-    "backend/venv",
-    "**/__pycache__"
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.*",
+    "backend/venv"
   ],
   "typeCheckingMode": "standard",
   "pythonVersion": "3.14",
