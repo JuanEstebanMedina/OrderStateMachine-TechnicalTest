@@ -373,34 +373,55 @@ Required local tools:
 - AWS SAM CLI
 - Docker
 
-Validate and build the SAM template from the repository root:
+Run SAM commands from the `infra` directory, where `template.yaml` and
+`samconfig.toml` are colocated. SAM is configured to build in a container
+because Lambda runs on Linux and the project contains native Python
+dependencies that must be packaged for the Lambda runtime environment.
 
-```bash
-sam validate --lint --template-file infra/template.yaml
-sam build --template-file infra/template.yaml
+Validate and build:
+
+```powershell
+cd infra
+sam validate --lint
+sam build
 ```
 
 Verify credentials before deploying:
 
-```bash
+```powershell
 aws sts get-caller-identity --profile <profile>
+aws configure get region --profile <profile>
 ```
 
-First deployment:
+Stop before deployment if the identity ARN returned by STS ends in `:root`;
+deployment should use an IAM user or role, not the account root identity.
 
-```bash
-sam deploy --guided --template-file infra/template.yaml --profile <profile>
+First deployment, using the built SAM artifact created by `sam build`:
+
+```powershell
+cd infra
+sam build
+sam deploy --guided --profile <profile>
 ```
 
 Set `FrontendOrigins` during guided deployment to the hosted frontend origin,
-for example the Vercel URL. The Lambda runtime supplies `AWS_REGION`; the
-template passes `PERSISTENCE_BACKEND=dynamodb`, the generated table name, and
-the joined CORS origins to the backend.
+for example:
+
+```text
+http://localhost:5173,https://your-project.vercel.app
+```
+
+`FrontendOrigins` must contain exact origins only. Do not use wildcard CORS.
+The SAM parameter configures both API Gateway CORS and the Lambda
+`CORS_ALLOWED_ORIGINS` environment variable. The Lambda runtime supplies
+`AWS_REGION`; the template passes `PERSISTENCE_BACKEND=dynamodb`, the generated
+table name, and the joined CORS origins to the backend.
 
 Subsequent deployments:
 
-```bash
-sam build --template-file infra/template.yaml
+```powershell
+cd infra
+sam build
 sam deploy --profile <profile>
 ```
 
@@ -412,7 +433,8 @@ python backend/scripts/smoke_test.py --base-url <ApiBaseUrl>
 
 Teardown:
 
-```bash
+```powershell
+cd infra
 sam delete --profile <profile>
 ```
 

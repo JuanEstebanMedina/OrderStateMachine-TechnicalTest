@@ -1,5 +1,8 @@
 version = 0.1
 
+[default.build.parameters]
+use_container = true
+
 [default.global.parameters]
 stack_name = "order-state-machine-serverless"
 
