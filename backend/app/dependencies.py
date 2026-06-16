@@ -5,10 +5,8 @@ from fastapi import Depends
 
 from app.adapters import (
     DynamoDBOrderRepository,
-    DynamoDBSupportTicketRepository,
     InMemoryOrderRepository,
     InMemoryStore,
-    InMemorySupportTicketRepository,
 )
 from app.config import (
     get_aws_region,
@@ -16,7 +14,7 @@ from app.config import (
     get_dynamodb_table_name,
     get_persistence_backend,
 )
-from app.ports import OrderRepository, SupportTicketRepository
+from app.ports import OrderRepository
 from app.services import OrderService, OrderStateMachine
 
 
@@ -28,32 +26,22 @@ def _create_dynamodb_client():
     )
 
 
-def _create_order_repository() -> tuple[OrderRepository, SupportTicketRepository]:
+def _create_order_repository() -> OrderRepository:
     if get_persistence_backend() == "memory":
         in_memory_store = InMemoryStore()
-        return (
-            InMemoryOrderRepository(in_memory_store),
-            InMemorySupportTicketRepository(in_memory_store),
-        )
+        return InMemoryOrderRepository(in_memory_store)
 
     client = _create_dynamodb_client()
     table_name = get_dynamodb_table_name()
-    return (
-        DynamoDBOrderRepository(client, table_name),
-        DynamoDBSupportTicketRepository(client, table_name),
-    )
+    return DynamoDBOrderRepository(client, table_name)
 
 
-_order_repository, _support_ticket_repository = _create_order_repository()
+_order_repository = _create_order_repository()
 _state_machine = OrderStateMachine()
 
 
 def get_order_repository() -> OrderRepository:
     return _order_repository
-
-
-def get_support_ticket_repository() -> SupportTicketRepository:
-    return _support_ticket_repository
 
 
 def get_state_machine() -> OrderStateMachine:

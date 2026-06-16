@@ -34,11 +34,9 @@ class DynamoDBOrderRepository(OrderRepository):
         self,
         client: Any,
         table_name: str,
-        page_size: int | None = None,
     ) -> None:
         self._client = client
         self._table_name = table_name
-        self._page_size = page_size
 
     def create(self, order: Order) -> Order:
         try:
@@ -156,8 +154,6 @@ class DynamoDBOrderRepository(OrderRepository):
     def _query_all(self, **kwargs: Any) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
         request = {"TableName": self._table_name, **kwargs}
-        if self._page_size is not None:
-            request["Limit"] = self._page_size
 
         while True:
             response = self._client.query(**request)

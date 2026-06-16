@@ -15,7 +15,6 @@ from app.adapters.dynamodb_mapper import (
     order_to_item,
     serialize_item,
     support_ticket_to_item,
-    ticket_item_to_support_ticket,
 )
 from app.domain import Order, OrderEventLog, OrderEventType, OrderState, SupportTicket
 
@@ -93,7 +92,7 @@ def test_event_mapping_converts_nested_metadata_numbers() -> None:
     assert mapped_event == build_event()
 
 
-def test_support_ticket_mapping_round_trips() -> None:
+def test_support_ticket_mapping_preserves_write_item_values() -> None:
     ticket = SupportTicket(
         id=TICKET_ID,
         order_id=ORDER_ID,
@@ -106,8 +105,8 @@ def test_support_ticket_mapping_round_trips() -> None:
     assert item["PK"] == f"ORDER#{ORDER_ID}"
     assert item["SK"] == f"TICKET#{TICKET_ID}"
     assert item["metadata"]["order_amount"] == Decimal("1200.5")
-
-    assert ticket_item_to_support_ticket(item) == ticket
+    assert item["reason"] == "High-value order payment failed"
+    assert item["createdAt"] == "2026-06-13T12:05:06.654321Z"
 
 
 def test_order_item_and_events_reconstruct_complete_order_in_sort_key_order() -> None:

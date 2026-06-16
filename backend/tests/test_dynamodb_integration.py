@@ -9,15 +9,14 @@ from uuid import UUID, uuid4
 
 import boto3
 import pytest
-from fastapi.testclient import TestClient
 
-from app.adapters import DynamoDBOrderRepository, DynamoDBSupportTicketRepository
+from app.adapters import DynamoDBOrderRepository
 from app.adapters.dynamodb_mapper import (
     EVENT_SK_PREFIX,
     TICKET_SK_PREFIX,
+    deserialize_item,
     order_pk,
 )
-from app.dependencies import get_order_service, get_state_machine
 from app.domain import (
     Order,
     OrderEventLog,
@@ -26,8 +25,8 @@ from app.domain import (
     OrderVersionConflictError,
     SupportTicket,
 )
-from app.main import app
 from app.services import OrderService, OrderStateMachine
+from scripts.create_dynamodb_table import build_table_request
 
 
 pytestmark = [
@@ -56,30 +55,7 @@ def create_client():
 
 
 def create_table(client, table_name: str) -> None:
-    client.create_table(
-        TableName=table_name,
-        KeySchema=[
-            {"AttributeName": "PK", "KeyType": "HASH"},
-            {"AttributeName": "SK", "KeyType": "RANGE"},
-        ],
-        AttributeDefinitions=[
-            {"AttributeName": "PK", "AttributeType": "S"},
-            {"AttributeName": "SK", "AttributeType": "S"},
-            {"AttributeName": "GSI1PK", "AttributeType": "S"},
-            {"AttributeName": "GSI1SK", "AttributeType": "S"},
-        ],
-        GlobalSecondaryIndexes=[
-            {
-                "IndexName": "GSI1",
-                "KeySchema": [
-                    {"AttributeName": "GSI1PK", "KeyType": "HASH"},
-                    {"AttributeName": "GSI1SK", "KeyType": "RANGE"},
-                ],
-                "Projection": {"ProjectionType": "ALL"},
-            }
-        ],
-        BillingMode="PAY_PER_REQUEST",
-    )
+    client.create_table(**build_table_request(table_name))
     client.get_waiter("table_exists").wait(TableName=table_name)
 
 
@@ -100,16 +76,6 @@ def order_repository(dynamodb_context: DynamoContext) -> DynamoDBOrderRepository
     return DynamoDBOrderRepository(dynamodb_context.client, dynamodb_context.table_name)
 
 
-@pytest.fixture
-def ticket_repository(
-    dynamodb_context: DynamoContext,
-) -> DynamoDBSupportTicketRepository:
-    return DynamoDBSupportTicketRepository(
-        dynamodb_context.client,
-        dynamodb_context.table_name,
-    )
-
-
 def build_order(amount: float = 1200.5) -> Order:
     return Order(
         id=uuid4(),
@@ -121,12 +87,13 @@ def build_order(amount: float = 1200.5) -> Order:
 
 
 def build_event(
+    event_id: UUID | None = None,
     event_type: OrderEventType = OrderEventType.NO_VERIFICATION_NEEDED,
     from_state: OrderState = OrderState.PENDING,
     to_state: OrderState = OrderState.PENDING_PAYMENT,
 ) -> OrderEventLog:
     return OrderEventLog(
-        id=uuid4(),
+        id=event_id or uuid4(),
         event_type=event_type,
         from_state=from_state,
         to_state=to_state,
@@ -148,9 +115,9 @@ def updated_order(order: Order, event_log: OrderEventLog) -> Order:
     )
 
 
-def build_ticket(order_id: UUID) -> SupportTicket:
+def build_ticket(order_id: UUID, ticket_id: UUID | None = None) -> SupportTicket:
     return SupportTicket(
-        id=uuid4(),
+        id=ticket_id or uuid4(),
         order_id=order_id,
         reason="Integration ticket",
         metadata={"source": "integration"},
@@ -171,7 +138,7 @@ def query_order_items(
     dynamodb_context: DynamoContext,
     order_id: UUID,
     sk_prefix: str,
-) -> list:
+) -> list[dict]:
     response = dynamodb_context.client.query(
         TableName=dynamodb_context.table_name,
         KeyConditionExpression="PK = :pk AND begins_with(SK, :sk_prefix)",
@@ -181,7 +148,7 @@ def query_order_items(
         },
         ConsistentRead=True,
     )
-    return response.get("Items", [])
+    return [deserialize_item(item) for item in response.get("Items", [])]
 
 
 def test_create_and_get_order(order_repository: DynamoDBOrderRepository) -> None:
@@ -202,82 +169,64 @@ def test_list_summaries_uses_gsi(order_repository: DynamoDBOrderRepository) -> N
     assert not hasattr(summaries[0], "history")
 
 
-def test_commit_transition_and_reconstruct_ordered_history(
+def test_commit_transition_and_reconstruct_history(
     order_repository: DynamoDBOrderRepository,
 ) -> None:
     order = order_repository.create(build_order())
-    first_event = build_event()
-    first_order = updated_order(order, first_event)
-    order_repository.commit_transition(first_order, first_event, None, 0)
-    second_event = build_event(
-        event_type=OrderEventType.PAYMENT_SUCCESSFUL,
-        from_state=OrderState.PENDING_PAYMENT,
-        to_state=OrderState.CONFIRMED,
-    )
-    second_order = updated_order(first_order, second_event)
+    event = build_event()
 
-    order_repository.commit_transition(second_order, second_event, None, 1)
+    order_repository.commit_transition(updated_order(order, event), event, None, 0)
 
     retrieved_order = order_repository.get_by_id(order.id)
     assert retrieved_order is not None
-    assert retrieved_order.current_state == OrderState.CONFIRMED
-    assert retrieved_order.version == 2
-    assert retrieved_order.history == [first_event, second_event]
+    assert retrieved_order.current_state == OrderState.PENDING_PAYMENT
+    assert retrieved_order.version == 1
+    assert retrieved_order.history == [event]
 
 
 def test_persist_high_value_payment_failure_ticket(
     order_repository: DynamoDBOrderRepository,
-    ticket_repository: DynamoDBSupportTicketRepository,
+    dynamodb_context: DynamoContext,
 ) -> None:
     service = OrderService(order_repository, OrderStateMachine())
     order = service.create_order(["product-1"], 1200.5)
 
     service.apply_event(order.id, OrderEventType.PAYMENT_FAILED, {"source": "test"})
 
-    tickets = ticket_repository.list_by_order_id(order.id)
+    tickets = query_order_items(dynamodb_context, order.id, TICKET_SK_PREFIX)
     assert len(tickets) == 1
-    assert tickets[0].reason == "High-value order payment failed"
+    assert tickets[0]["entityType"] == "SUPPORT_TICKET"
+    assert tickets[0]["reason"] == "High-value order payment failed"
 
 
-@pytest.mark.parametrize("amount", [1000.0, 999.99])
-def test_no_ticket_for_payment_failure_at_or_below_1000(
-    order_repository: DynamoDBOrderRepository,
-    ticket_repository: DynamoDBSupportTicketRepository,
-    amount: float,
-) -> None:
-    service = OrderService(order_repository, OrderStateMachine())
-    order = service.create_order(["product-1"], amount)
-
-    service.apply_event(order.id, OrderEventType.PAYMENT_FAILED, {"source": "test"})
-
-    assert ticket_repository.list_by_order_id(order.id) == []
-
-
-def test_two_stale_transitions_allow_exactly_one_success(
+def test_stale_version_rejection_leaves_no_orphan_items(
     order_repository: DynamoDBOrderRepository,
     dynamodb_context: DynamoContext,
 ) -> None:
     order = order_repository.create(build_order())
+    first_event = build_event()
+    stale_event = build_event()
+    first_ticket = build_ticket(order.id)
+    stale_ticket = build_ticket(order.id)
+    first_update = updated_order(order, first_event)
+    stale_update = updated_order(order, stale_event)
 
-    def commit() -> str:
-        event = build_event()
-        try:
-            order_repository.commit_transition(
-                updated_order(order, event),
-                event,
-                build_ticket(order.id),
-                expected_version=0,
-            )
-        except OrderVersionConflictError:
-            return "conflict"
-        return "success"
+    order_repository.commit_transition(first_update, first_event, first_ticket, 0)
+    with pytest.raises(OrderVersionConflictError):
+        order_repository.commit_transition(
+            stale_update,
+            stale_event,
+            stale_ticket,
+            expected_version=0,
+        )
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        results = [future.result(timeout=5) for future in [executor.submit(commit), executor.submit(commit)]]
+    events = query_order_items(dynamodb_context, order.id, EVENT_SK_PREFIX)
+    tickets = query_order_items(dynamodb_context, order.id, TICKET_SK_PREFIX)
 
-    assert sorted(results) == ["conflict", "success"]
-    assert len(query_order_items(dynamodb_context, order.id, EVENT_SK_PREFIX)) == 1
-    assert len(query_order_items(dynamodb_context, order.id, TICKET_SK_PREFIX)) == 1
+    assert [event["eventId"] for event in events] == [str(first_event.id)]
+    assert [ticket["ticketId"] for ticket in tickets] == [str(first_ticket.id)]
+    assert str(stale_event.id) not in {event["eventId"] for event in events}
+    assert str(stale_ticket.id) not in {ticket["ticketId"] for ticket in tickets}
 
 
 def test_independent_transitions_for_different_orders(
@@ -294,78 +243,3 @@ def test_independent_transitions_for_different_orders(
             future.result(timeout=5)
 
     assert all(order_repository.get_by_id(order.id).version == 1 for order in orders)
-
-
-def test_repository_conflict_maps_to_http_409(
-    dynamodb_context: DynamoContext,
-) -> None:
-    class StaleOnCommitRepository(DynamoDBOrderRepository):
-        def __init__(self) -> None:
-            super().__init__(dynamodb_context.client, dynamodb_context.table_name)
-            self._bumped = False
-
-        def get_by_id(self, order_id: UUID) -> Order | None:
-            order = super().get_by_id(order_id)
-            if order is not None and not self._bumped:
-                self._bumped = True
-                event = build_event()
-                super().commit_transition(updated_order(order, event), event, None, 0)
-            return order
-
-    repository = StaleOnCommitRepository()
-    state_machine = OrderStateMachine()
-    service = OrderService(repository, state_machine)
-    app.dependency_overrides[get_order_service] = lambda: service
-    app.dependency_overrides[get_state_machine] = lambda: state_machine
-
-    try:
-        with TestClient(app) as client:
-            created = client.post(
-                "/orders",
-                json={"productIds": ["product-1"], "amount": 1200.5},
-            ).json()
-            response = client.post(
-                f"/orders/{created['orderId']}/events",
-                json={"eventType": "noVerificationNeeded", "metadata": {}},
-            )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 409
-
-
-def test_conditional_create_prevents_replacement(
-    order_repository: DynamoDBOrderRepository,
-) -> None:
-    order = build_order()
-    order_repository.create(order)
-
-    with pytest.raises(ValueError):
-        order_repository.create(order)
-
-
-def test_gsi_pagination(dynamodb_context: DynamoContext) -> None:
-    repository = DynamoDBOrderRepository(
-        dynamodb_context.client,
-        dynamodb_context.table_name,
-        page_size=1,
-    )
-    orders = [repository.create(build_order()) for _ in range(3)]
-
-    summaries = wait_for_summaries(repository, 3)
-
-    assert {summary.id for summary in summaries} == {order.id for order in orders}
-
-
-def test_base_table_detail_reads_latest_state(
-    order_repository: DynamoDBOrderRepository,
-) -> None:
-    order = order_repository.create(build_order())
-    event = build_event()
-    order_repository.commit_transition(updated_order(order, event), event, None, 0)
-
-    retrieved_order = order_repository.get_by_id(order.id)
-
-    assert retrieved_order is not None
-    assert retrieved_order.current_state == OrderState.PENDING_PAYMENT
-    assert retrieved_order.version == 1

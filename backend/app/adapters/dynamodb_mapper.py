@@ -184,16 +184,6 @@ def support_ticket_to_item(ticket: SupportTicket) -> dict[str, Any]:
     }
 
 
-def ticket_item_to_support_ticket(item: dict[str, Any]) -> SupportTicket:
-    return SupportTicket(
-        id=UUID(item["ticketId"]),
-        order_id=UUID(item["orderId"]),
-        reason=item["reason"],
-        metadata=restore_domain_numbers(item["metadata"]),
-        created_at=parse_utc_timestamp(item["createdAt"]),
-    )
-
-
 def order_item_and_event_items_to_order(
     order_item: dict[str, Any],
     event_items: list[dict[str, Any]],

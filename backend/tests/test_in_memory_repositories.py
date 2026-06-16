@@ -8,7 +8,6 @@ import pytest
 from app.adapters import (
     InMemoryOrderRepository,
     InMemoryStore,
-    InMemorySupportTicketRepository,
 )
 from app.domain import (
     Order,
@@ -69,16 +68,13 @@ def support_ticket(order_id: UUID = ORDER_ID) -> SupportTicket:
     )
 
 
-def create_repositories() -> tuple[
-    InMemoryOrderRepository,
-    InMemorySupportTicketRepository,
-]:
+def create_repository() -> tuple[InMemoryOrderRepository, InMemoryStore]:
     store = InMemoryStore()
-    return InMemoryOrderRepository(store), InMemorySupportTicketRepository(store)
+    return InMemoryOrderRepository(store), store
 
 
 def test_create_stores_order_at_version_zero() -> None:
-    order_repository, _ticket_repository = create_repositories()
+    order_repository, _store = create_repository()
     order = Order(id=ORDER_ID, product_ids=["product-1"], amount=100.0)
 
     saved_order = order_repository.create(order)
@@ -90,13 +86,13 @@ def test_create_stores_order_at_version_zero() -> None:
 
 
 def test_returns_none_when_order_does_not_exist() -> None:
-    order_repository, _ticket_repository = create_repositories()
+    order_repository, _store = create_repository()
 
     assert order_repository.get_by_id(MISSING_ORDER_ID) is None
 
 
 def test_list_summaries_excludes_history() -> None:
-    order_repository, _ticket_repository = create_repositories()
+    order_repository, _store = create_repository()
     order = Order(
         id=ORDER_ID,
         product_ids=["product-1"],
@@ -114,7 +110,7 @@ def test_list_summaries_excludes_history() -> None:
 
 
 def test_commit_transition_increments_version_and_persists_history() -> None:
-    order_repository, _ticket_repository = create_repositories()
+    order_repository, _store = create_repository()
     order = order_repository.create(
         Order(id=ORDER_ID, product_ids=["product-1"], amount=100.0)
     )
@@ -134,7 +130,7 @@ def test_commit_transition_increments_version_and_persists_history() -> None:
 
 
 def test_commit_transition_persists_ticket_atomically() -> None:
-    order_repository, ticket_repository = create_repositories()
+    order_repository, store = create_repository()
     order = order_repository.create(
         Order(id=ORDER_ID, product_ids=["product-1"], amount=1500.0)
     )
@@ -148,11 +144,11 @@ def test_commit_transition_persists_ticket_atomically() -> None:
         expected_version=0,
     )
 
-    assert ticket_repository.list_by_order_id(ORDER_ID) == [ticket]
+    assert store.tickets == {TICKET_ID: ticket}
 
 
 def test_stale_expected_version_raises_conflict_without_partial_writes() -> None:
-    order_repository, ticket_repository = create_repositories()
+    order_repository, store = create_repository()
     order = order_repository.create(
         Order(id=ORDER_ID, product_ids=["product-1"], amount=1500.0)
     )
@@ -179,11 +175,11 @@ def test_stale_expected_version_raises_conflict_without_partial_writes() -> None
     stored_order = order_repository.get_by_id(ORDER_ID)
     assert stored_order is not None
     assert stored_order.history == [first_log]
-    assert ticket_repository.list_by_order_id(ORDER_ID) == []
+    assert store.tickets == {}
 
 
 def test_stale_from_state_raises_conflict() -> None:
-    order_repository, _ticket_repository = create_repositories()
+    order_repository, _store = create_repository()
     order = order_repository.create(
         Order(id=ORDER_ID, product_ids=["product-1"], amount=100.0)
     )
@@ -199,7 +195,7 @@ def test_stale_from_state_raises_conflict() -> None:
 
 
 def test_returned_order_changes_do_not_mutate_repository_storage() -> None:
-    order_repository, _ticket_repository = create_repositories()
+    order_repository, _store = create_repository()
     order = Order(id=ORDER_ID, product_ids=["product-1"], amount=100.0)
     order_repository.create(order)
 
@@ -214,38 +210,8 @@ def test_returned_order_changes_do_not_mutate_repository_storage() -> None:
     assert stored_order == order
 
 
-def test_returned_support_ticket_changes_do_not_mutate_repository_storage() -> None:
-    order_repository, ticket_repository = create_repositories()
-    order = order_repository.create(
-        Order(id=ORDER_ID, product_ids=["product-1"], amount=1200.0)
-    )
-    log = event_log(to_state=OrderState.CANCELLED)
-    ticket = support_ticket()
-    order_repository.commit_transition(
-        order=updated_order(order, log, version=1),
-        event_log=log,
-        support_ticket=ticket,
-        expected_version=0,
-    )
-
-    retrieved_ticket = ticket_repository.list_by_order_id(ORDER_ID)[0]
-
-    retrieved_ticket.reason = "Changed reason"
-    retrieved_ticket.metadata["amount"] = 900.0
-
-    stored_ticket = ticket_repository.list_by_order_id(ORDER_ID)[0]
-
-    assert stored_ticket == ticket
-
-
-def test_empty_list_when_order_has_no_support_tickets() -> None:
-    _order_repository, ticket_repository = create_repositories()
-
-    assert ticket_repository.list_by_order_id(ORDER_ID) == []
-
-
 def test_different_orders_can_transition_concurrently() -> None:
-    order_repository, _ticket_repository = create_repositories()
+    order_repository, _store = create_repository()
     orders = [
         order_repository.create(
             Order(
@@ -282,7 +248,7 @@ def test_different_orders_can_transition_concurrently() -> None:
 
 
 def test_two_stale_updates_to_same_order_allow_exactly_one_success() -> None:
-    order_repository, ticket_repository = create_repositories()
+    order_repository, store = create_repository()
     order = order_repository.create(
         Order(id=ORDER_ID, product_ids=["product-1"], amount=1500.0)
     )
@@ -314,4 +280,4 @@ def test_two_stale_updates_to_same_order_allow_exactly_one_success() -> None:
     assert stored_order is not None
     assert stored_order.version == 1
     assert len(stored_order.history) == 1
-    assert len(ticket_repository.list_by_order_id(ORDER_ID)) == 1
+    assert len(store.tickets) == 1

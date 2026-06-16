@@ -92,8 +92,10 @@ consistent, so tests that need immediate summary visibility use bounded polling.
 For this technical test, a single `GSI1PK=ORDERS` partition is acceptable. A
 high-scale production system would likely shard or bucket that index partition.
 
-Order detail reads use strongly consistent base-table reads: one `GetItem` for
-the order item and one `Query` for event items. Event history is reconstructed
+Order detail reads use `ConsistentRead=True` for each base-table operation: one
+`GetItem` for the order item and one `Query` for event items. The assembled
+detail response is not a multi-operation transactional snapshot; it is a
+practical read model for this technical test. Event history is reconstructed
 from separate event items sorted by their sort keys.
 
 Each transition uses exactly one DynamoDB `TransactWriteItems` request:

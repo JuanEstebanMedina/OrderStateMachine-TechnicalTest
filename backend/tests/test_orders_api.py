@@ -5,7 +5,7 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
-from app.adapters import InMemoryOrderRepository, InMemoryStore, InMemorySupportTicketRepository
+from app.adapters import InMemoryOrderRepository, InMemoryStore
 from app.dependencies import get_order_service, get_state_machine
 from app.domain import OrderEventType, OrderVersionConflictError
 from app.main import app
@@ -15,14 +15,13 @@ from app.services import OrderService, OrderStateMachine
 @dataclass
 class ApiTestContext:
     client: TestClient
-    support_ticket_repository: InMemorySupportTicketRepository
+    store: InMemoryStore
 
 
 @pytest.fixture
 def api_context() -> Generator[ApiTestContext, None, None]:
     store = InMemoryStore()
     order_repository = InMemoryOrderRepository(store)
-    support_ticket_repository = InMemorySupportTicketRepository(store)
     state_machine = OrderStateMachine()
     service = OrderService(
         order_repository=order_repository,
@@ -35,7 +34,7 @@ def api_context() -> Generator[ApiTestContext, None, None]:
     with TestClient(app) as client:
         yield ApiTestContext(
             client=client,
-            support_ticket_repository=support_ticket_repository,
+            store=store,
         )
 
     app.dependency_overrides.clear()
@@ -496,6 +495,10 @@ def test_high_value_payment_failure_creates_support_ticket(
     assert data["currentState"] == "Cancelled"
 
     order_id = UUID(data["orderId"])
-    tickets = api_context.support_ticket_repository.list_by_order_id(order_id)
+    tickets = [
+        ticket
+        for ticket in api_context.store.tickets.values()
+        if ticket.order_id == order_id
+    ]
     assert len(tickets) == 1
     assert tickets[0].reason == "High-value order payment failed"
