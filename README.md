@@ -255,6 +255,34 @@ npm run build
 npm run test:run
 ```
 
+## Code coverage
+
+Stable backend coverage excludes opt-in DynamoDB Local integration tests:
+
+```bash
+cd backend
+python -m pytest tests -m "not integration" --cov=app --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml
+```
+
+PowerShell:
+
+```powershell
+cd backend
+python -m pytest tests -m "not integration" --cov=app --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml
+```
+
+Frontend coverage:
+
+```bash
+cd frontend
+npm run test:coverage
+```
+
+Backend XML is written to `backend/coverage.xml`. Frontend LCOV is written to
+`frontend/coverage/lcov.info`. Generated reports are ignored by Git. DynamoDB
+Local integration tests remain opt-in and may be included in a separate full
+local backend coverage run.
+
 ## API documentation
 
 When the backend is running, OpenAPI documentation is available at:
