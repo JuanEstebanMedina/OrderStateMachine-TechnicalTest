@@ -23,6 +23,8 @@ class InMemoryOrderRepository(OrderRepository):
                 if order.id in self._store.orders:
                     raise ValueError(f"Order {order.id} already exists")
 
+                # Store copies so callers cannot mutate repository state after
+                # a successful write.
                 self._store.orders[order.id] = deepcopy(order)
             return deepcopy(order)
 
@@ -58,6 +60,8 @@ class InMemoryOrderRepository(OrderRepository):
         support_ticket: SupportTicket | None,
         expected_version: int,
     ) -> Order:
+        # Per-order locks allow unrelated orders to transition concurrently
+        # while preserving the same optimistic-lock boundary as DynamoDB.
         order_lock = self._store.get_order_lock(order.id)
 
         with order_lock:
@@ -71,6 +75,8 @@ class InMemoryOrderRepository(OrderRepository):
                 raise OrderVersionConflictError(order.id, expected_version)
 
             with self._store.get_registry_lock():
+                # Defensive copies keep test callers from mutating stored
+                # orders or support tickets through retained object references.
                 self._store.orders[order.id] = deepcopy(order)
 
                 if support_ticket is not None:

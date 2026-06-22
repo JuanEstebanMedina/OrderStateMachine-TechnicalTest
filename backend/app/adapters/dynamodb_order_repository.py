@@ -92,6 +92,9 @@ class DynamoDBOrderRepository(OrderRepository):
         support_ticket: SupportTicket | None,
         expected_version: int,
     ) -> Order:
+        # Keep the order update first so cancellation reason index 0 identifies
+        # the optimistic-lock check we intentionally translate to a domain
+        # conflict.
         transact_items: list[dict[str, Any]] = [
             {
                 "Update": {
@@ -105,6 +108,9 @@ class DynamoDBOrderRepository(OrderRepository):
                     "ConditionExpression": (
                         "#version = :expected_version AND currentState = :from_state"
                     ),
+                    # Version detects stale writers; source state detects races
+                    # where the version is current but the intended transition
+                    # no longer starts from the loaded state.
                     "ExpressionAttributeNames": {"#version": "version"},
                     "ExpressionAttributeValues": serialize_item(
                         {
@@ -138,6 +144,9 @@ class DynamoDBOrderRepository(OrderRepository):
             )
 
         try:
+            # The token protects retries of this already-built DynamoDB
+            # transaction. Separate HTTP requests create new event IDs, so this
+            # is not client-level idempotency.
             self._client.transact_write_items(
                 TransactItems=transact_items,
                 ClientRequestToken=str(event_log.id),
@@ -167,5 +176,8 @@ class DynamoDBOrderRepository(OrderRepository):
         expected_version: int,
     ) -> None:
         reasons = error.response.get("CancellationReasons", [])
+        # Only the order update's conditional failure is a business conflict;
+        # later item failures or AWS transaction conflicts remain infrastructure
+        # errors for the caller to handle.
         if reasons and reasons[0].get("Code") == "ConditionalCheckFailed":
             raise OrderVersionConflictError(order_id, expected_version) from error
