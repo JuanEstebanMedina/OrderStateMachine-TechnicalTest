@@ -57,6 +57,8 @@ export function useOrderWorkspace({
     availableEvents: false,
     event: false,
   });
+  // AbortControllers cancel transport work; the generation counter also guards
+  // against already-resolved stale promises updating the currently selected order.
   const selectionGeneration = useRef(0);
   const selectedOrderIdRef = useRef<string | null>(null);
   const workspaceLoadController = useRef<AbortController | null>(null);
