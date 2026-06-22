@@ -283,7 +283,7 @@ Generated coverage output is ignored by Git.
 
 ## CI and SonarCloud
 
-Pull requests targeting `main` run GitHub Actions validation for Pyright,
+Pull requests and pushes targeting `main` and `develop` run GitHub Actions validation for Pyright,
 backend coverage, frontend lint/build/coverage, and a SonarCloud quality-gate
 scan. The workflow can also be started manually from GitHub Actions.
 
@@ -292,7 +292,7 @@ Manual repository setup:
 1. Create the `SONAR_TOKEN` repository secret.
 2. Create `SONAR_ORGANIZATION` and `SONAR_PROJECT_KEY` repository variables.
 3. Disable SonarCloud Automatic Analysis before using CI-based analysis.
-4. After the first successful run, protect `main` and require the CI and
+4. After the first successful run, protect `main` and `develop` and require the CI and
    SonarCloud quality-gate checks.
 
 ## API Endpoints
