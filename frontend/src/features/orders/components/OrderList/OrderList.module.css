@@ -26,8 +26,14 @@
 }
 
 .orderCardList {
+  --order-card-min-width: 260px;
+  --order-card-max-width: 360px;
+
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 280px));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(var(--order-card-min-width), 280px)
+  );
   justify-content: start;
   gap: var(--space-3);
   margin: 0;
@@ -100,6 +106,32 @@
 
 .orderCardAction {
   width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .orderCardList {
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(var(--order-card-min-width), 1fr)
+    );
+    justify-content: stretch;
+  }
+
+  .orderCardList:has(> :only-child) {
+    grid-template-columns: minmax(
+      var(--order-card-min-width),
+      var(--order-card-max-width)
+    );
+    justify-content: start;
+  }
+
+  .orderCardList:has(> :first-child:nth-last-child(2)) {
+    grid-template-columns: repeat(
+      2,
+      minmax(var(--order-card-min-width), var(--order-card-max-width))
+    );
+    justify-content: start;
+  }
 }
 
 @media (max-width: 640px) {

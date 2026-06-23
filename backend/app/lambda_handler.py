@@ -17,6 +17,7 @@ logger = Logger(service=SERVICE_NAME)
 tracer = Tracer(service=SERVICE_NAME)
 metrics = Metrics(namespace=METRICS_NAMESPACE, service=SERVICE_NAME)
 app = create_app(root_path=API_GATEWAY_BASE_PATH)
+# Mangum adapts API Gateway/Lambda events to the ASGI interface FastAPI speaks.
 asgi_handler = Mangum(
     app,
     lifespan="off",
@@ -25,6 +26,8 @@ asgi_handler = Mangum(
 
 
 def _safe_api_context(event: dict[str, Any]) -> dict[str, Any]:
+    # Only request identity fields are logged; headers, bodies, authorizers, and
+    # order metadata may contain credentials or customer-provided data.
     request_context = event.get("requestContext")
     if not isinstance(request_context, dict):
         return {}

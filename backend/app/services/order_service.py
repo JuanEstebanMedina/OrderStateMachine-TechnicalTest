@@ -63,6 +63,9 @@ class OrderService:
         to_state = self._state_machine.get_next_state(from_state, event_type)
         timestamp = self._utc_now()
 
+        # Validate the transition before constructing persistence records, then
+        # hand the order update, event, and optional side effect to one atomic
+        # repository operation.
         event_log = OrderEventLog(
             id=uuid.uuid4(),
             event_type=event_type,

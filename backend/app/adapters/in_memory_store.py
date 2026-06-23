@@ -15,6 +15,8 @@ class InMemoryStore:
         with self._registry_lock:
             lock = self._order_locks.get(order_id)
             if lock is None:
+                # Locks are allocated per order so independent transitions do
+                # not serialize through one global mutation lock.
                 lock = Lock()
                 self._order_locks[order_id] = lock
             return lock
