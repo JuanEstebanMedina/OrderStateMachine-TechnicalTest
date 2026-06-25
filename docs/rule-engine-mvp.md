@@ -87,6 +87,14 @@ Condition trees support nested `AND` and `OR` groups:
 }
 ```
 
+For this MVP, `SET_FINAL_STATE` validates only that the configured target maps
+to a known `OrderState`. The state machine still validates the base transition
+first, and the override can only replace that valid proposed state afterward.
+Because allowed override targets are not yet modeled per event and source
+state, configuration can currently select a semantically surprising state. A
+production version should validate allowed override targets for the event and
+source-state pair before rules become runtime-managed.
+
 ## Rule Model
 
 Rules are selected by `eventType` and current order state. The engine builds an
@@ -125,6 +133,9 @@ Supported operators:
 - `GREATER_THAN`
 - `LESS_THAN`
 - `IN`
+
+`GREATER_THAN` and `LESS_THAN` are accepted only for numeric fields: `amount`
+and `productCount`.
 
 Missing metadata evaluates to `False` for every comparison, including
 `NOT_EQUALS`. This prevents absent user-provided data from accidentally making a
@@ -211,6 +222,11 @@ Conflicting overrides fail instead of relying on JSON order. The MVP does not
 include priorities, first-rule-wins, last-rule-wins, exclusive groups, or a
 generic conflict resolver.
 
+The current parser accepts any known `OrderState` for `SET_FINAL_STATE`. This is
+an explicit MVP boundary, not a state-machine change. The state machine proposes
+a valid base state before rules run; the override is post-validation business
+policy and cannot make an invalid event valid.
+
 Monetary actions are additive:
 
 ```text
@@ -222,6 +238,13 @@ final_amount = base_amount + tax_amount + sum(fixed costs)
 All percentages use the original amount, so action order does not affect the
 result. The project keeps the existing `float` amount representation for
 compatibility.
+
+The MVP persists only the final calculated `Order.amount`. It does not persist a
+separate monetary-adjustment ledger containing the base amount, individual tax
+effects, individual fixed-cost effects, or monetary rule IDs. As a result, the
+final event does not provide full financial reconstruction of every monetary
+adjustment. A production financial implementation should store immutable
+adjustment records or an equivalent auditable breakdown.
 
 Support-ticket drafts are aggregated because the repository still accepts one
 optional `SupportTicket`:
@@ -260,12 +283,25 @@ Optimistic locking remains based on the loaded source state and expected
 version. A state override changes the final persisted state, but it does not
 weaken the source-state/version condition.
 
+Optimistic locking prevents concurrent lost updates for the same loaded order
+version. It does not prevent a rule from being applied again during a later,
+separate valid event. `ClientRequestToken` protects retries of one already-built
+DynamoDB transaction, not rule-level or HTTP-level idempotency. Reliable replay
+protection would need a persistent execution identity such as order ID, event ID
+or client idempotency key, rule ID, and rule version, plus rule-execution
+records.
+
 ## MVP Limits And Future Work
 
-This MVP intentionally excludes controllers, rule CRUD endpoints, frontend
-changes, runtime editing, versions, approval workflows, effective dates,
-execution audit, simulation endpoints, external side-effect outbox, and rich
-conflict strategies.
+This MVP intentionally keeps several limits explicit:
+
+- Override target restrictions are not yet modeled per event and source state.
+- Rules are loaded once from local JSON and are not dynamically reloaded.
+- There is no monetary-adjustment ledger for tax or fixed-cost effects.
+- There is no persistent rule-execution audit.
+- Optimistic locking is not rule-level or HTTP-level idempotency.
+- There is no rule versioning or approval workflow.
+- External actions would require an outbox and idempotency design later.
 
 A future `DynamoDBRuleRepository` can implement the same `RuleRepository` port
 and return typed `OrderRule` values. That would not require changing

@@ -26,6 +26,12 @@ from app.domain import (
 from app.ports import RuleRepository
 
 
+NUMERIC_RULE_FIELDS = {
+    RuleField.AMOUNT,
+    RuleField.PRODUCT_COUNT,
+}
+
+
 class JsonRuleRepository(RuleRepository):
     """Loads and validates local JSON rule definitions once at construction."""
 
@@ -49,7 +55,11 @@ class JsonRuleRepository(RuleRepository):
             ) from error
 
         rules = _required_list(raw_document, "rules", "rule configuration")
-        return [_parse_rule(raw_rule, index) for index, raw_rule in enumerate(rules)]
+        parsed_rules = [
+            _parse_rule(raw_rule, index) for index, raw_rule in enumerate(rules)
+        ]
+        _validate_unique_rule_ids(parsed_rules)
+        return parsed_rules
 
 
 def _parse_rule(raw_rule: Any, index: int) -> OrderRule:
@@ -101,14 +111,16 @@ def _parse_node(raw_node: Any, path: str) -> RuleNode:
 
     node_type = _required_non_empty_string(raw_node, "type", path)
     if node_type == "CONDITION":
+        field = _parse_enum(
+            RuleField,
+            _required_non_empty_string(raw_node, "field", path),
+            f"{path}.field",
+        )
+        operator = _parse_comparison_operator(raw_node, path)
         return ConditionNode(
-            field=_parse_enum(
-                RuleField,
-                _required_non_empty_string(raw_node, "field", path),
-                f"{path}.field",
-            ),
-            operator=_parse_comparison_operator(raw_node, path),
-            value=_parse_condition_value(raw_node, path),
+            field=field,
+            operator=operator,
+            value=_parse_condition_value(raw_node, path, field, operator),
         )
 
     if node_type == "GROUP":
@@ -138,19 +150,27 @@ def _parse_comparison_operator(raw_node: dict[str, Any], path: str) -> Compariso
     )
 
 
-def _parse_condition_value(raw_node: dict[str, Any], path: str) -> Any:
-    operator = _parse_comparison_operator(raw_node, path)
+def _parse_condition_value(
+    raw_node: dict[str, Any],
+    path: str,
+    field: RuleField,
+    operator: ComparisonOperator,
+) -> Any:
     if "value" not in raw_node:
         raise RuleConfigurationError(f"{path}.value is required")
 
     value = raw_node["value"]
-    if operator in {
-        ComparisonOperator.GREATER_THAN,
-        ComparisonOperator.LESS_THAN,
-    } and not _is_finite_number(value):
-        raise RuleConfigurationError(
-            f"{path}.value must be a finite number for {operator.value}"
-        )
+    if operator in {ComparisonOperator.GREATER_THAN, ComparisonOperator.LESS_THAN}:
+        if field not in NUMERIC_RULE_FIELDS:
+            raise RuleConfigurationError(
+                f"{path}.operator {operator.value} is incompatible with "
+                f"field {field.value}"
+            )
+
+        if not _is_finite_number(value):
+            raise RuleConfigurationError(
+                f"{path}.value must be a finite number for {operator.value}"
+            )
 
     if operator == ComparisonOperator.IN:
         if not isinstance(value, list):
@@ -196,6 +216,8 @@ def _parse_action(raw_action: Any, path: str) -> RuleAction:
             parameters=AddFixedCostParameters(amount=amount),
         )
 
+    # TODO(post-MVP): Restrict SET_FINAL_STATE targets by event and source-state
+    # policy before rules become runtime-managed.
     state = _parse_enum(
         OrderState,
         _required_non_empty_string(parameters, "state", f"{path}.parameters"),
@@ -249,6 +271,14 @@ def _required_non_negative_number(
             f"{path}.{key} must be a finite non-negative number"
         )
     return float(value)
+
+
+def _validate_unique_rule_ids(rules: list[OrderRule]) -> None:
+    seen_rule_ids: set[str] = set()
+    for rule in rules:
+        if rule.id in seen_rule_ids:
+            raise RuleConfigurationError(f"Duplicate rule id {rule.id!r}")
+        seen_rule_ids.add(rule.id)
 
 
 def _parse_enum(enum_type: type[Any], value: Any, path: str) -> Any:

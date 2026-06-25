@@ -185,9 +185,9 @@ def _default_field_resolvers() -> dict[RuleField, Callable[[RuleContext], Any]]:
     return {
         RuleField.AMOUNT: lambda context: context.order.amount,
         RuleField.PRODUCT_COUNT: lambda context: len(context.order.product_ids),
-        RuleField.CURRENT_STATE: lambda context: context.from_state,
-        RuleField.PROPOSED_STATE: lambda context: context.proposed_state,
-        RuleField.EVENT_TYPE: lambda context: context.event_type,
+        RuleField.CURRENT_STATE: lambda context: context.from_state.value,
+        RuleField.PROPOSED_STATE: lambda context: context.proposed_state.value,
+        RuleField.EVENT_TYPE: lambda context: context.event_type.value,
         RuleField.ORIGIN_COUNTRY: _metadata_resolver("originCountry"),
         RuleField.DESTINATION_COUNTRY: _metadata_resolver("destinationCountry"),
         RuleField.MANUAL_REVIEW_REQUIRED: _metadata_resolver("manualReviewRequired"),

@@ -132,6 +132,37 @@ def test_evaluator_supports_comparison_operators(
     assert RuleEvaluator().evaluate(node, context(metadata=metadata)) is expected
 
 
+@pytest.mark.parametrize(
+    "node",
+    [
+        condition(
+            RuleField.CURRENT_STATE,
+            ComparisonOperator.EQUALS,
+            "PendingPayment",
+        ),
+        condition(
+            RuleField.PROPOSED_STATE,
+            ComparisonOperator.EQUALS,
+            "Confirmed",
+        ),
+        condition(
+            RuleField.EVENT_TYPE,
+            ComparisonOperator.EQUALS,
+            "paymentSuccessful",
+        ),
+        condition(
+            RuleField.EVENT_TYPE,
+            ComparisonOperator.IN,
+            ("paymentSuccessful", "paymentFailed"),
+        ),
+    ],
+)
+def test_evaluator_compares_enum_backed_fields_as_serialized_values(
+    node: ConditionNode,
+) -> None:
+    assert RuleEvaluator().evaluate(node, context())
+
+
 def test_evaluator_supports_nested_and_or() -> None:
     node = GroupNode(
         operator=LogicalOperator.OR,

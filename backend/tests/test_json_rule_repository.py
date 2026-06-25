@@ -6,6 +6,7 @@ import pytest
 from app.adapters import JsonRuleRepository
 from app.domain import (
     AddTaxParameters,
+    ConditionNode,
     GroupNode,
     OrderState,
     RuleActionType,
@@ -111,6 +112,81 @@ def test_parses_set_final_state_action(tmp_path: Path) -> None:
     assert action.action_type == RuleActionType.SET_FINAL_STATE
     assert isinstance(action.parameters, SetFinalStateParameters)
     assert action.parameters.state == OrderState.ON_HOLD
+
+
+def test_distinct_rule_ids_load_successfully(tmp_path: Path) -> None:
+    first_rule = valid_rule(id="rule-1")
+    second_rule = valid_rule(id="rule-2")
+
+    rules = JsonRuleRepository(write_rules(tmp_path, [first_rule, second_rule])).list_enabled()
+
+    assert [rule.id for rule in rules] == ["rule-1", "rule-2"]
+
+
+def test_duplicate_rule_ids_fail(tmp_path: Path) -> None:
+    first_rule = valid_rule(id="duplicate-rule")
+    second_rule = valid_rule(id="duplicate-rule")
+
+    with pytest.raises(RuleConfigurationError, match="duplicate-rule"):
+        JsonRuleRepository(write_rules(tmp_path, [first_rule, second_rule]))
+
+
+def test_duplicate_rule_ids_fail_even_when_one_rule_is_disabled(
+    tmp_path: Path,
+) -> None:
+    first_rule = valid_rule(id="duplicate-rule", enabled=False)
+    second_rule = valid_rule(id="duplicate-rule", enabled=True)
+
+    with pytest.raises(RuleConfigurationError, match="duplicate-rule"):
+        JsonRuleRepository(write_rules(tmp_path, [first_rule, second_rule]))
+
+
+@pytest.mark.parametrize(
+    ("field", "operator"),
+    [
+        ("destinationCountry", "GREATER_THAN"),
+        ("manualReviewRequired", "LESS_THAN"),
+    ],
+)
+def test_rejects_numeric_comparison_on_non_numeric_field(
+    tmp_path: Path,
+    field: str,
+    operator: str,
+) -> None:
+    rule = valid_rule(
+        condition={
+            "type": "CONDITION",
+            "field": field,
+            "operator": operator,
+            "value": 5,
+        }
+    )
+
+    with pytest.raises(
+        RuleConfigurationError,
+        match=f"{operator} is incompatible with field {field}",
+    ):
+        JsonRuleRepository(write_rules(tmp_path, [rule]))
+
+
+@pytest.mark.parametrize("field", ["amount", "productCount"])
+def test_allows_numeric_comparison_on_numeric_fields(
+    tmp_path: Path,
+    field: str,
+) -> None:
+    rule = valid_rule(
+        condition={
+            "type": "CONDITION",
+            "field": field,
+            "operator": "LESS_THAN",
+            "value": 5000,
+        }
+    )
+
+    parsed_rule = JsonRuleRepository(write_rules(tmp_path, [rule])).list_enabled()[0]
+
+    assert isinstance(parsed_rule.condition, ConditionNode)
+    assert parsed_rule.condition.field.value == field
 
 
 @pytest.mark.parametrize(
