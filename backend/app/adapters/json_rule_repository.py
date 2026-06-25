@@ -216,8 +216,8 @@ def _parse_action(raw_action: Any, path: str) -> RuleAction:
             parameters=AddFixedCostParameters(amount=amount),
         )
 
-    # TODO(post-MVP): Restrict SET_FINAL_STATE targets by event and source-state
-    # policy before rules become runtime-managed.
+    # MVP boundary: SET_FINAL_STATE currently accepts any known state.
+    # Runtime-managed rules should restrict targets by event and source state.
     state = _parse_enum(
         OrderState,
         _required_non_empty_string(parameters, "state", f"{path}.parameters"),
