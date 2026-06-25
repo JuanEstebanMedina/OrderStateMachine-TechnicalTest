@@ -7,9 +7,15 @@ from fastapi.testclient import TestClient
 
 from app.adapters import InMemoryOrderRepository, InMemoryStore
 from app.dependencies import get_order_service, get_state_machine
-from app.domain import OrderEventType, OrderVersionConflictError
+from app.domain import (
+    OrderEventType,
+    OrderState,
+    OrderVersionConflictError,
+    RuleStateOverrideConflictError,
+)
 from app.main import app
 from app.services import OrderService, OrderStateMachine
+from rule_test_utils import create_default_rule_engine
 
 
 @dataclass
@@ -26,6 +32,7 @@ def api_context() -> Generator[ApiTestContext, None, None]:
     service = OrderService(
         order_repository=order_repository,
         state_machine=state_machine,
+        rule_engine=create_default_rule_engine(),
     )
 
     app.dependency_overrides[get_order_service] = lambda: service
@@ -444,6 +451,33 @@ def test_version_conflict_returns_409(api_context: ApiTestContext) -> None:
     assert response.status_code == 409
     assert str(conflict_order_id) in response.json()["detail"]
     assert "version 0" in response.json()["detail"]
+
+
+def test_rule_state_override_conflict_returns_409(
+    api_context: ApiTestContext,
+) -> None:
+    conflict_order_id = UUID("11111111-1111-1111-1111-111111111187")
+
+    class ConflictService:
+        def apply_event(
+            self,
+            order_id: UUID,
+            event_type: OrderEventType,
+            metadata: dict,
+        ) -> None:
+            raise RuleStateOverrideConflictError(
+                (OrderState.ON_HOLD, OrderState.CANCELLED)
+            )
+
+    app.dependency_overrides[get_order_service] = lambda: ConflictService()
+
+    response = api_context.client.post(
+        f"/orders/{conflict_order_id}/events",
+        json={"eventType": "paymentSuccessful", "metadata": {}},
+    )
+
+    assert response.status_code == 409
+    assert "Conflicting rule final-state overrides" in response.json()["detail"]
 
 
 def test_unknown_event_type_returns_422(api_context: ApiTestContext) -> None:

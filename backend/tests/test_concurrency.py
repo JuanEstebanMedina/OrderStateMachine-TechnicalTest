@@ -4,6 +4,7 @@ from uuid import UUID
 from app.adapters import InMemoryOrderRepository
 from app.domain import Order, OrderEventType, OrderState
 from app.services import OrderService, OrderStateMachine
+from rule_test_utils import create_default_rule_engine
 
 
 def test_processes_events_for_different_orders_concurrently() -> None:
@@ -11,6 +12,7 @@ def test_processes_events_for_different_orders_concurrently() -> None:
     service = OrderService(
         order_repository=order_repository,
         state_machine=OrderStateMachine(),
+        rule_engine=create_default_rule_engine(),
     )
     orders = [
         service.create_order(product_ids=[f"product-{index}"], amount=100.0)

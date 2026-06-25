@@ -28,6 +28,7 @@ from app.domain import (
     SupportTicket,
 )
 from app.services import OrderService, OrderStateMachine
+from rule_test_utils import create_default_rule_engine
 from scripts.create_dynamodb_table import build_table_request
 
 
@@ -190,7 +191,11 @@ def test_persist_high_value_payment_failure_ticket(
     order_repository: DynamoDBOrderRepository,
     dynamodb_context: DynamoContext,
 ) -> None:
-    service = OrderService(order_repository, OrderStateMachine())
+    service = OrderService(
+        order_repository,
+        OrderStateMachine(),
+        create_default_rule_engine(),
+    )
     order = service.create_order(["product-1"], 1200.5)
 
     service.apply_event(order.id, OrderEventType.PAYMENT_FAILED, {"source": "test"})
@@ -199,6 +204,50 @@ def test_persist_high_value_payment_failure_ticket(
     assert len(tickets) == 1
     assert tickets[0]["entityType"] == "SUPPORT_TICKET"
     assert tickets[0]["reason"] == "High-value order payment failed"
+
+
+def test_monetary_rule_persists_final_amount(
+    order_repository: DynamoDBOrderRepository,
+) -> None:
+    service = OrderService(
+        order_repository,
+        OrderStateMachine(),
+        create_default_rule_engine(),
+    )
+    order = service.create_order(["product-1"], 1200.0)
+    service.apply_event(order.id, OrderEventType.NO_VERIFICATION_NEEDED)
+
+    service.apply_event(
+        order.id,
+        OrderEventType.PAYMENT_SUCCESSFUL,
+        {"destinationCountry": "US"},
+    )
+
+    stored_order = order_repository.get_by_id(order.id)
+    assert stored_order is not None
+    assert stored_order.amount == pytest.approx(1345.0)
+
+
+def test_state_override_rule_persists_final_state(
+    order_repository: DynamoDBOrderRepository,
+) -> None:
+    service = OrderService(
+        order_repository,
+        OrderStateMachine(),
+        create_default_rule_engine(),
+    )
+    order = service.create_order(["product-1"], 100.0)
+    service.apply_event(order.id, OrderEventType.NO_VERIFICATION_NEEDED)
+
+    service.apply_event(
+        order.id,
+        OrderEventType.PAYMENT_SUCCESSFUL,
+        {"manualReviewRequired": True},
+    )
+
+    stored_order = order_repository.get_by_id(order.id)
+    assert stored_order is not None
+    assert stored_order.current_state == OrderState.ON_HOLD
 
 
 def test_stale_version_rejection_leaves_no_orphan_items(

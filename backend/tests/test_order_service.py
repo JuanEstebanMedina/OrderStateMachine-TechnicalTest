@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 from unittest.mock import Mock, create_autospec, patch
 from uuid import UUID
 
@@ -10,12 +11,16 @@ from app.domain import (
     Order,
     OrderEventType,
     OrderNotFoundError,
+    RuleEngineResult,
+    RuleStateOverrideConflictError,
     OrderState,
     OrderSummary,
+    SupportTicketDraft,
     SupportTicket,
 )
 from app.ports import OrderRepository
-from app.services import OrderService, OrderStateMachine
+from app.services import OrderService, OrderStateMachine, RuleEngine
+from rule_test_utils import create_default_rule_engine
 
 
 ORDER_ID = UUID("11111111-1111-1111-1111-111111111111")
@@ -26,16 +31,40 @@ GENERATED_EVENT_ID = UUID("44444444-4444-4444-4444-444444444444")
 GENERATED_TICKET_ID = UUID("55555555-5555-5555-5555-555555555555")
 
 
-def create_service() -> tuple[OrderService, Mock]:
+def create_service(rule_engine: RuleEngine | None = None) -> tuple[OrderService, Mock]:
     order_repository = create_autospec(OrderRepository, instance=True)
     order_repository.commit_transition.side_effect = lambda **kwargs: kwargs["order"]
 
     service = OrderService(
         order_repository=order_repository,
         state_machine=OrderStateMachine(),
+        rule_engine=rule_engine or create_default_rule_engine(),
     )
 
     return service, order_repository
+
+
+class FakeRuleEngine:
+    def __init__(
+        self,
+        result: RuleEngineResult | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.contexts: list[Any] = []
+        self._result = result or RuleEngineResult(
+            matched_rule_ids=(),
+            total_tax_percentage=0.0,
+            total_fixed_cost=0.0,
+            support_ticket_drafts=(),
+            final_state_override=None,
+        )
+        self._error = error
+
+    def evaluate(self, context: Any) -> RuleEngineResult:
+        self.contexts.append(context)
+        if self._error is not None:
+            raise self._error
+        return self._result
 
 
 def test_create_order_uses_generated_uuid_and_creates_order() -> None:
@@ -143,6 +172,34 @@ def test_apply_event_builds_updated_order_and_commits_once() -> None:
     assert result == committed_order
 
 
+def test_apply_event_passes_rule_context_after_state_machine_proposal() -> None:
+    fake_rule_engine = FakeRuleEngine()
+    service, order_repository = create_service(cast(RuleEngine, fake_rule_engine))
+    order = Order(
+        id=ORDER_ID,
+        product_ids=["product-1"],
+        amount=100.0,
+        current_state=OrderState.PENDING_PAYMENT,
+    )
+    metadata = {"details": {"paymentId": "payment-1"}}
+    order_repository.get_by_id.return_value = order
+
+    service.apply_event(
+        order_id=ORDER_ID,
+        event_type=OrderEventType.PAYMENT_SUCCESSFUL,
+        metadata=metadata,
+    )
+    metadata["details"]["paymentId"] = "changed"
+
+    assert len(fake_rule_engine.contexts) == 1
+    context = fake_rule_engine.contexts[0]
+    assert context.order == order
+    assert context.event_type == OrderEventType.PAYMENT_SUCCESSFUL
+    assert context.from_state == OrderState.PENDING_PAYMENT
+    assert context.proposed_state == OrderState.CONFIRMED
+    assert context.event_metadata == {"details": {"paymentId": "payment-1"}}
+
+
 def test_apply_event_uses_one_timestamp_for_order_and_event() -> None:
     service, order_repository = create_service()
     order = Order(
@@ -184,6 +241,75 @@ def test_apply_event_uses_defensive_copy_for_history_metadata() -> None:
     assert result.history[0].metadata == {"details": {"paymentId": "payment-1"}}
 
 
+def test_metadata_based_default_rule_does_not_match_when_metadata_is_absent() -> None:
+    service, order_repository = create_service()
+    order = Order(
+        id=ORDER_ID,
+        product_ids=["product-1"],
+        amount=1200.0,
+        current_state=OrderState.PENDING_PAYMENT,
+    )
+    order_repository.get_by_id.return_value = order
+
+    result = service.apply_event(
+        order_id=ORDER_ID,
+        event_type=OrderEventType.PAYMENT_SUCCESSFUL,
+    )
+
+    assert result.amount == pytest.approx(1200.0)
+    assert result.current_state == OrderState.CONFIRMED
+
+
+def test_monetary_default_rule_updates_order_amount() -> None:
+    service, order_repository = create_service()
+    order = Order(
+        id=ORDER_ID,
+        product_ids=["product-1"],
+        amount=1200.0,
+        current_state=OrderState.PENDING_PAYMENT,
+    )
+    order_repository.get_by_id.return_value = order
+
+    result = service.apply_event(
+        order_id=ORDER_ID,
+        event_type=OrderEventType.PAYMENT_SUCCESSFUL,
+        metadata={"destinationCountry": "US"},
+    )
+
+    assert result.amount == pytest.approx(1345.0)
+    assert result.current_state == OrderState.CONFIRMED
+
+
+def test_final_state_override_updates_order_event_and_metadata() -> None:
+    service, order_repository = create_service()
+    order = Order(
+        id=ORDER_ID,
+        product_ids=["product-1"],
+        amount=100.0,
+        current_state=OrderState.PENDING_PAYMENT,
+    )
+    order_repository.get_by_id.return_value = order
+
+    result = service.apply_event(
+        order_id=ORDER_ID,
+        event_type=OrderEventType.PAYMENT_SUCCESSFUL,
+        metadata={"manualReviewRequired": True},
+    )
+
+    event_log = order_repository.commit_transition.call_args.kwargs["event_log"]
+    assert result.current_state == OrderState.ON_HOLD
+    assert event_log.to_state == OrderState.ON_HOLD
+    assert event_log.metadata["rule_state_override"] == {
+        "proposed_state": "Confirmed",
+        "final_state": "OnHold",
+        "matched_rule_ids": ["manual-review-payment-success"],
+    }
+    assert OrderStateMachine().get_next_state(
+        OrderState.PENDING_PAYMENT,
+        OrderEventType.PAYMENT_SUCCESSFUL,
+    ) == OrderState.CONFIRMED
+
+
 def test_invalid_transition_does_not_commit_or_mutate_order() -> None:
     service, order_repository = create_service()
     order = Order(
@@ -204,6 +330,27 @@ def test_invalid_transition_does_not_commit_or_mutate_order() -> None:
 
     order_repository.commit_transition.assert_not_called()
     assert order == original_order
+
+
+def test_invalid_transition_does_not_evaluate_rule_engine() -> None:
+    fake_rule_engine = FakeRuleEngine()
+    service, order_repository = create_service(cast(RuleEngine, fake_rule_engine))
+    order = Order(
+        id=ORDER_ID,
+        product_ids=["product-1"],
+        amount=1500.0,
+        current_state=OrderState.CONFIRMED,
+    )
+    order_repository.get_by_id.return_value = order
+
+    with pytest.raises(InvalidOrderTransitionError):
+        service.apply_event(
+            order_id=ORDER_ID,
+            event_type=OrderEventType.PAYMENT_FAILED,
+        )
+
+    assert fake_rule_engine.contexts == []
+    order_repository.commit_transition.assert_not_called()
 
 
 def test_apply_event_to_missing_order_does_not_commit() -> None:
@@ -251,6 +398,74 @@ def test_valid_high_value_payment_failure_creates_support_ticket_in_commit() -> 
         "event_metadata": metadata,
     }
     assert ticket.created_at == event_log.created_at
+
+
+def test_multiple_ticket_drafts_create_one_aggregated_ticket() -> None:
+    fake_rule_engine = FakeRuleEngine(
+        RuleEngineResult(
+            matched_rule_ids=("rule-a", "rule-b"),
+            total_tax_percentage=0.0,
+            total_fixed_cost=25.0,
+            support_ticket_drafts=(
+                SupportTicketDraft("rule-a", "Review address"),
+                SupportTicketDraft("rule-b", "Review address"),
+                SupportTicketDraft("rule-b", "Review payment"),
+            ),
+            final_state_override=None,
+        )
+    )
+    service, order_repository = create_service(cast(RuleEngine, fake_rule_engine))
+    order = Order(
+        id=ORDER_ID,
+        product_ids=["product-1"],
+        amount=100.0,
+        current_state=OrderState.PENDING_PAYMENT,
+    )
+    order_repository.get_by_id.return_value = order
+
+    with patch(
+        "app.services.order_service.uuid.uuid4",
+        side_effect=[GENERATED_EVENT_ID, GENERATED_TICKET_ID],
+    ):
+        service.apply_event(
+            order_id=ORDER_ID,
+            event_type=OrderEventType.PAYMENT_SUCCESSFUL,
+            metadata={"source": "checkout"},
+        )
+
+    ticket = order_repository.commit_transition.call_args.kwargs["support_ticket"]
+    assert isinstance(ticket, SupportTicket)
+    assert ticket.reason == "Multiple rule-based support reviews required"
+    assert ticket.metadata == {
+        "order_amount": 125.0,
+        "event_metadata": {"source": "checkout"},
+        "reasons": ["Review address", "Review payment"],
+        "matched_rule_ids": ["rule-a", "rule-b"],
+    }
+
+
+def test_conflicting_final_state_overrides_do_not_commit() -> None:
+    fake_rule_engine = FakeRuleEngine(
+        error=RuleStateOverrideConflictError(
+            (OrderState.ON_HOLD, OrderState.CANCELLED)
+        )
+    )
+    service, order_repository = create_service(cast(RuleEngine, fake_rule_engine))
+    order = Order(
+        id=ORDER_ID,
+        product_ids=["product-1"],
+        amount=100.0,
+        current_state=OrderState.PENDING_PAYMENT,
+    )
+    order_repository.get_by_id.return_value = order
+
+    with pytest.raises(RuleStateOverrideConflictError):
+        service.apply_event(
+            order_id=ORDER_ID,
+            event_type=OrderEventType.PAYMENT_SUCCESSFUL,
+        )
+
+    order_repository.commit_transition.assert_not_called()
 
 
 @pytest.mark.parametrize("amount", [1000.0, 999.99])
