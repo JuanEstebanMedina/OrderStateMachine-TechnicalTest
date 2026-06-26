@@ -39,13 +39,14 @@ jobs:
         run: npx --yes pyright --project pyrightconfig.json
 
       - name: Run backend tests with coverage
-        working-directory: backend
+        env:
+          PYTHONPATH: backend
         run: >
-          python -m pytest tests -m "not integration"
-          --cov=app
+          python -m pytest backend/tests -m "not integration"
+          --cov=backend/app
           --cov-branch
           --cov-report=term-missing
-          --cov-report=xml:coverage.xml
+          --cov-report=xml:backend/coverage.xml
 
       - name: Install frontend dependencies
         working-directory: frontend

@@ -27,3 +27,14 @@ class InvalidOrderTransitionError(DomainError):
         super().__init__(
             f"Invalid order transition from {current_state.value} with event {event_type.value}"
         )
+
+
+class RuleConfigurationError(DomainError):
+    pass
+
+
+class RuleStateOverrideConflictError(DomainError):
+    def __init__(self, target_states: tuple[OrderState, ...]) -> None:
+        self.target_states = target_states
+        targets = ", ".join(state.value for state in target_states)
+        super().__init__(f"Conflicting rule final-state overrides: {targets}")

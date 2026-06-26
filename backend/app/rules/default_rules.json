@@ -1,0 +1,85 @@
+{
+  "rules": [
+    {
+      "id": "high-value-payment-failure",
+      "name": "High-value payment failure support review",
+      "enabled": true,
+      "eventType": "paymentFailed",
+      "fromStates": ["Pending"],
+      "condition": {
+        "type": "CONDITION",
+        "field": "amount",
+        "operator": "GREATER_THAN",
+        "value": 1000
+      },
+      "actions": [
+        {
+          "type": "CREATE_SUPPORT_TICKET",
+          "parameters": {
+            "reason": "High-value order payment failed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "us-high-value-payment-surcharge",
+      "name": "US high-value payment surcharge",
+      "enabled": true,
+      "eventType": "paymentSuccessful",
+      "fromStates": ["PendingPayment"],
+      "condition": {
+        "type": "GROUP",
+        "operator": "AND",
+        "children": [
+          {
+            "type": "CONDITION",
+            "field": "amount",
+            "operator": "GREATER_THAN",
+            "value": 1000
+          },
+          {
+            "type": "CONDITION",
+            "field": "destinationCountry",
+            "operator": "EQUALS",
+            "value": "US"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "ADD_TAX",
+          "parameters": {
+            "percentage": 10
+          }
+        },
+        {
+          "type": "ADD_FIXED_COST",
+          "parameters": {
+            "amount": 25
+          }
+        }
+      ]
+    },
+    {
+      "id": "manual-review-payment-success",
+      "name": "Manual review required after successful payment",
+      "enabled": true,
+      "eventType": "paymentSuccessful",
+      "fromStates": ["PendingPayment"],
+      "condition": {
+        "type": "CONDITION",
+        "field": "manualReviewRequired",
+        "operator": "EQUALS",
+        "value": true
+      },
+      "actions": [
+        {
+          "type": "SET_FINAL_STATE",
+          "parameters": {
+            "state": "OnHold"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -18,6 +18,7 @@ from app.adapters.dynamodb_mapper import (
     serialize_item,
     serialize_key,
     support_ticket_to_item,
+    to_dynamodb_number,
 )
 from app.domain import (
     Order,
@@ -102,6 +103,7 @@ class DynamoDBOrderRepository(OrderRepository):
                     "Key": serialize_key(order_pk(order.id), ORDER_SK),
                     "UpdateExpression": (
                         "SET currentState = :to_state, "
+                        "amount = :amount, "
                         "#version = :new_version, "
                         "updatedAt = :updated_at"
                     ),
@@ -115,6 +117,7 @@ class DynamoDBOrderRepository(OrderRepository):
                     "ExpressionAttributeValues": serialize_item(
                         {
                             ":to_state": order.current_state.value,
+                            ":amount": to_dynamodb_number(order.amount),
                             ":new_version": order.version,
                             ":updated_at": format_utc_timestamp(order.updated_at),
                             ":expected_version": expected_version,
