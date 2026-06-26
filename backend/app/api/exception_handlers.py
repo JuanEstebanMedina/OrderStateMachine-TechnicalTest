@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from app.domain import (
     InvalidOrderTransitionError,
     OrderNotFoundError,
+    RuleStateOverrideConflictError,
     OrderVersionConflictError,
 )
 
@@ -38,7 +39,20 @@ def order_version_conflict_handler(
     )
 
 
+def rule_state_override_conflict_handler(
+    _request: Request,
+    exc: RuleStateOverrideConflictError,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={"detail": str(exc)},
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     app.exception_handler(OrderNotFoundError)(order_not_found_handler)
     app.exception_handler(InvalidOrderTransitionError)(invalid_order_transition_handler)
     app.exception_handler(OrderVersionConflictError)(order_version_conflict_handler)
+    app.exception_handler(RuleStateOverrideConflictError)(
+        rule_state_override_conflict_handler
+    )

@@ -122,6 +122,24 @@ def test_first_operation_conditional_failure_becomes_version_conflict() -> None:
     assert "Put" in transact_items[2]
 
 
+def test_commit_transition_updates_amount_in_transaction() -> None:
+    client = FakeDynamoDBClient()
+    repository = DynamoDBOrderRepository(client, "Orders")
+    order = build_order()
+    order.amount = 1345.0
+
+    repository.commit_transition(
+        order,
+        build_event(),
+        None,
+        expected_version=0,
+    )
+
+    update = client.transact_write_items_calls[0]["TransactItems"][0]["Update"]
+    assert "amount = :amount" in update["UpdateExpression"]
+    assert update["ExpressionAttributeValues"][":amount"]["N"] == "1345.0"
+
+
 def test_first_operation_transaction_conflict_remains_aws_exception() -> None:
     error = cancelled_error([{"Code": "TransactionConflict"}])
     repository, _client = repository_with_error(error)

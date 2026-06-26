@@ -64,6 +64,21 @@ flowchart LR
 Local development can also run the backend directly with Uvicorn and either
 in-memory storage or DynamoDB Local.
 
+The backend also includes a local dynamic business-rule MVP. It loads rules
+from `backend/app/rules/default_rules.json` during dependency initialization and
+applies them after state-machine validation. See
+[docs/rule-engine-mvp.md](docs/rule-engine-mvp.md) for the rule model,
+supported actions, and persistence policies.
+
+### Rule Engine MVP Boundaries
+
+- Rules are local JSON and are loaded once at startup.
+- `SET_FINAL_STATE` accepts any known state after base-transition validation.
+- Only the final calculated amount is persisted, not an adjustment ledger.
+- Optimistic locking is not rule-execution or HTTP-level idempotency.
+- Detailed design and limitations are in
+  [docs/rule-engine-mvp.md](docs/rule-engine-mvp.md).
+
 ## Key Design Decisions
 
 - The backend is the source of truth for valid transitions; the frontend only
